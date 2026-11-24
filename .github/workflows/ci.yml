@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: packages/core — lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/core
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/core/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Typecheck (tsc --noEmit, strict)
+        run: npm run typecheck
+
+      - name: Unit tests (Vitest)
+        run: npm run test
+
+      - name: Build bundle (esbuild -> dist/boxlens-core.umd.js)
+        run: npm run build
+        # Note: the committed dist/boxlens-core.umd.js is what the deployed app
+        # loads. A future hardening step can assert `git diff --exit-code dist/`
+        # once cross-environment esbuild determinism is confirmed.

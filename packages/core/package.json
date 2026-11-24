@@ -1,0 +1,29 @@
+{
+  "name": "@boxlens/core",
+  "version": "1.0.0",
+  "description": "Pure TypeScript core for BoxLens — ISO 6346, VGM Method 2, compliance rules, geo, congestion, provenance. Zero DOM dependency.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/boxlens-core.umd.js",
+  "module": "src/index.ts",
+  "files": ["dist", "src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "esbuild src/index.ts --bundle --format=iife --global-name=BoxLensCore --outfile=dist/boxlens-core.umd.js --target=es2019 --minify",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}

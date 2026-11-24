@@ -5,16 +5,47 @@ chain: it helps forwarders, shippers, agents, terminals, depots and hauliers
 avoid rejected gate-ins, weight errors, EDI exceptions and surprise delays by
 unifying open industry data behind one clean product.
 
-This repository is a **single-file, dependency-free demo build** that
-implements the MVP core and the UX of all six modules, with **real
-algorithms** (ISO 6346 check digit, VGM Method 2, the compliance rule engine,
-haversine nearest-facility, congestion heuristic) and **sample data** wherever
-a live provider call would be. It runs in any browser with no build step.
+This repository is a **single-file demo build** (one `index.html` plus a
+prebuilt core bundle) that implements the MVP core and the UX of all six
+modules. The **real algorithms** — ISO 6346 check digit, VGM Method 2, the
+compliance rule engine, haversine nearest-facility, the congestion heuristic
+and the provenance model — live in [`packages/core`](packages/core), a
+pure-TypeScript library with strict types and full Vitest coverage (65 tests).
+The app loads the prebuilt, committed bundle, so the **deployed site still has
+no build step**; **sample data** is used wherever a live provider call would
+be.
 
 > ⚠ **Legal positioning.** BoxLens assists with data and calculations only. It
 > does **not** certify a VGM, does not replace the shipper's legal
 > responsibility under SOLAS VI/2, and must never present estimates or missing
 > data as official facts. Disclaimers appear in the UI, PDFs and API docs.
+
+---
+
+## Core package (`packages/core`)
+
+The product's pure logic is extracted into a typed, tested, DOM-free library:
+
+| Module | Exports | Notes |
+| --- | --- | --- |
+| `iso6346` | `checkDigit`, `validate`, `normalize`, `suggestCorrected`, `LETTER_VALUES`, `GOLDEN`, `runGoldenTests` | Authoritative ISO 6346 algorithm; `CSQU3054383` anchors the Wikipedia worked example. |
+| `vgm` | `computeMethod2`, `checkLimits`, `evaluate` | SOLAS VI/2 Method 2: tare + cargo, with max-gross / max-payload checks. |
+| `rules` | `RULES`, `evaluate` | Compliance engine: pass / warn / fail / nodata with documented precedence. |
+| `geo` | `haversine` | Great-circle distance (R = 6371 km). |
+| `congestion` | `score` | Port congestion 0–100 (queue × 8 + waiting × 15, capped). |
+| `provenance` | `qualityBadgeParts`, `provenanceClass`, `QUALITY_STATES` | ok / partial / missing / stale / conflict. |
+
+```bash
+cd packages/core
+npm install
+npm test            # vitest — 65 tests
+npm run typecheck   # tsc --noEmit (strict)
+npm run build       # esbuild -> dist/boxlens-core.umd.js (window.BoxLensCore)
+```
+
+CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build on every
+PR and push to `main`, and guards that the committed bundle stays in sync with
+source. See [`CHANGELOG.md`](CHANGELOG.md) for version history.
 
 ---
 

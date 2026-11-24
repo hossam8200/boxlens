@@ -11,6 +11,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- ECharts for dashboards -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<!-- BoxLens pure-logic core (ISO 6346, VGM, rules, geo, congestion, provenance) — built & tested from packages/core -->
+<script src="packages/core/dist/boxlens-core.umd.js"></script>
 <style>
 /* ============ DESIGN TOKENS ============ */
 :root{
@@ -319,25 +321,9 @@ function save(key,val){localStorage.setItem('bl-'+key,JSON.stringify(val))}
 function audit(action,detail){state.audit.unshift({ts:new Date().toISOString(),action,detail:detail||''});if(state.audit.length>200)state.audit.length=200;save('audit',state.audit)}
 
 /* ---------- ISO 6346 (real algorithm) ---------- */
-const LETTER_VALUES={};let _n=10;for(let c=65;c<=90;c++){const ch=String.fromCharCode(c);if(_n%11===0)_n++;if(_n%11===0)_n++;LETTER_VALUES[ch]=_n;_n++}
-function iso6346CheckDigit(id){
-  if(!/^[A-Z]{4}\d{6}$/.test(id))return null;
-  let sum=0;for(let i=0;i<10;i++){const ch=id[i];const v=ch>='0'&&ch<='9'?+ch:LETTER_VALUES[ch];sum+=v*Math.pow(2,i)}
-  return (sum%11)%10;
-}
-function validateContainer(num){
-  const id=String(num||'').toUpperCase().replace(/\s+/g,'');
-  const result={input:num,normalized:id,valid:false,checkDigit:null,expected:null,errors:[]};
-  if(id.length!==11){result.errors.push('Must be 11 characters (4 letters + 6 digits + 1 check digit)');return result}
-  if(!/^[A-Z]{4}/.test(id))result.errors.push('First 4 characters must be letters (owner code)');
-  if(!/^\d{7}$/.test(id.slice(4)))result.errors.push('Last 7 characters must be digits');
-  if(result.errors.length)return result;
-  const expected=iso6346CheckDigit(id.slice(0,10));
-  result.checkDigit=+id[10];result.expected=expected;
-  result.valid=(result.checkDigit===expected);
-  if(!result.valid)result.errors.push('Check digit mismatch: expected '+expected+', got '+result.checkDigit);
-  return result;
-}
+const LETTER_VALUES=window.BoxLensCore.iso6346.LETTER_VALUES;
+function iso6346CheckDigit(id){return window.BoxLensCore.iso6346.checkDigit(id)}
+function validateContainer(num){return window.BoxLensCore.iso6346.validate(num)}
 // golden test cases (will be asserted on load) — CSQU3054383 anchors to the
 // worked example in the Wikipedia ISO 6346 article (check digit 3).
 const GOLDEN=[
@@ -350,7 +336,7 @@ const GOLDEN=[
   {id:'MSCU66398',valid:false},    // too short
   {id:'12345678901',valid:false},  // letters missing
 ];
-function runGoldenTests(){const fails=[];for(const g of GOLDEN){const r=validateContainer(g.id);if(r.valid!==g.valid)fails.push(g.id+' expected '+g.valid+' got '+r.valid)}return fails}
+function runGoldenTests(){return window.BoxLensCore.iso6346.runGoldenTests()}
 
 /* ---------- sample data ---------- */
 const OWNERS={
@@ -512,8 +498,8 @@ function $all(sel,root){return Array.from((root||document).querySelectorAll(sel)
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmt(n,u){const w=state.locale==='ar';const v=Number(n||0).toLocaleString(state.locale,{maximumFractionDigits:1});return v+(u?' '+u:'')}
 function daysAgo(iso){if(!iso)return null;const d=(Date.now()-new Date(iso).getTime())/86400000;return d<1?'<1d':Math.floor(d)+'d'}
-function qualityBadge(q){const m={ok:['ok','OK'],partial:['warn','Partial'],missing:['bad','Missing'],stale:['warn','Stale'],conflict:['bad','Conflict']};const c=m[q]||['neutral','—'];return '<span class="badge '+c[0]+'">'+c[1]+'</span>'}
-function provBadge(src,q,age){return '<span class="prov '+(q==='ok'?'ok':q==='stale'?'warn':q==='partial'?'warn':q==='missing'?'bad':'info')+'">'+esc(src)+(age?' · '+age:'')+'</span>'}
+function qualityBadge(q){const p=window.BoxLensCore.provenance.qualityBadgeParts(q);return '<span class="badge '+p.cls+'">'+p.label+'</span>'}
+function provBadge(src,q,age){return '<span class="prov '+window.BoxLensCore.provenance.provenanceClass(q)+'">'+esc(src)+(age?' · '+age:'')+'</span>'}
 function toast(msg){const d=el('<div class="toast">'+esc(msg)+'</div>');$('#toast').appendChild(d);setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),200)},2400)}
 function csvParse(text){const rows=[];const lines=text.replace(/\r/g,'').split('\n').filter(l=>l.trim());for(const l of lines){const cells=[];let cur='',inq=false;for(let i=0;i<l.length;i++){const c=l[i];if(c==='"'){if(inq&&l[i+1]==='"'){cur+='"';i++}else inq=!inq}else if(c===','&&!inq){cells.push(cur);cur=''}else cur+=c}cells.push(cur);rows.push(cells)}return rows}
 function csvBuild(rows){return rows.map(r=>r.map(c=>{c=String(c==null?'':c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(',')).join('\n')}
@@ -937,11 +923,11 @@ function renderSpec(r){
       <button class="btn sm" id="vgmSheet">📄 ${t('c.declarationSheet')}</button>
     </div>`;
   $('#vgmCalc').onclick=()=>{
-    const cargo=+$('#vgmCargo').value||0;const vgm=spec.tare+cargo;
-    $('#vgmOut').value=vgm+' kg';
-    const w=[];if(vgm>spec.maxGross)w.push('VGM ('+vgm+') exceeds max gross mass ('+spec.maxGross+').');if(cargo>spec.maxPayload)w.push('Cargo ('+cargo+') exceeds max payload ('+spec.maxPayload+').');
-    $('#vgmWarn').innerHTML=w.length?'<div class="alert bad">'+w.join(' ')+'</div>':'<div class="alert ok">Within limits.</div>';
-    state._lastVgm={id,tare:spec.tare,cargo,vgm,maxGross:spec.maxGross,maxPayload:spec.maxPayload,within:w.length===0,source:sourceLabel};
+    const cargo=+$('#vgmCargo').value||0;
+    const r=window.BoxLensCore.vgm.evaluate(spec.tare,cargo,spec.maxGross,spec.maxPayload);
+    $('#vgmOut').value=r.vgm+' kg';
+    $('#vgmWarn').innerHTML=r.within?'<div class="alert ok">Within limits.</div>':'<div class="alert bad">'+r.warnings.join(' ')+'</div>';
+    state._lastVgm={id,tare:spec.tare,cargo,vgm:r.vgm,maxGross:spec.maxGross,maxPayload:spec.maxPayload,within:r.within,source:sourceLabel};
   };
   $('#vgmSheet').onclick=()=>{
     if(!state._lastVgm||state._lastVgm.id!==id){$('#vgmCalc').click()}
@@ -1064,7 +1050,7 @@ function renderFacTab(tab){
     };
   }
 }
-function haversine(la1,lo1,la2,lo2){const R=6371;const dLat=(la2-la1)*Math.PI/180;const dLon=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))}
+function haversine(la1,lo1,la2,lo2){return window.BoxLensCore.geo.haversine(la1,lo1,la2,lo2)}
 function showOnMap(code){const f=B.FACILITIES.find(x=>x.code===code);if(!f||!B._map)return;B._map.setView([f.lat,f.lng],11);L.popup().setLatLng([f.lat,f.lng]).setContent('<b>'+f.code+'</b><br>'+esc(f.name)).openOn(B._map)}
 function initMap(){
   if(B._map){try{B._map.remove()}catch(e){}}
@@ -1166,18 +1152,10 @@ function runBulk(text){
   step();
 }
 function evaluateRow(id,weight,vessel,port,st){
-  const v=B.validateContainer(id);const reasons=[];let result='pass';
-  if(!v.valid){result='fail';reasons.push('Invalid check digit');}
+  const v=B.validateContainer(id);
   const spec=B.CONTAINERS[id]||B.state.manual[id];
-  if(!spec){if(result==='pass')result='nodata';reasons.push('No technical record');}
-  else{
-    if(weight+spec.tare>spec.maxGross){result='fail';reasons.push('VGM > max gross ('+spec.maxGross+')')}
-    else if(weight>spec.maxPayload){result='fail';reasons.push('Cargo > max payload ('+spec.maxPayload+')')}
-    if(st&&spec.sizeType&&st.toUpperCase()!==spec.sizeType){if(result==='pass')result='warn';reasons.push('Size/type mismatch ('+spec.sizeType+')')}
-    if(spec.csc&&!spec.csc.approved){if(result==='pass'||result==='warn')result='warn';reasons.push('CSC not approved')}
-    if(spec.quality==='stale'){if(result==='pass')result='warn';reasons.push('Stale data')}
-  }
-  return{id,vessel,port,weight,spec,result,reasons};
+  const r=window.BoxLensCore.rules.evaluate({valid:v.valid,spec:spec||null,weight:weight||0,sizeType:st||null});
+  return{id,vessel,port,weight,spec,result:r.result,reasons:r.reasons};
 }
 function finishBulk(results){
   B.state._lastBulk={rows:results};
@@ -1329,7 +1307,7 @@ function renderArrivals(app){
   audit('view','arrivals');
   setTimeout(initMap,50);
   const updatePort=()=>{const code=$('#arrPort').value;const v=B.VESSELS.filter(x=>x.port===code);const w=B.WEATHER[code];const h=B.HOLIDAYS.filter(x=>x.country===B.FACILITIES.find(f=>f.code===code).country);
-    const queue=v.reduce((a,x)=>a+x.queue,0);const cong=Math.min(100,queue*8+v.filter(x=>x.status==='waiting').length*15);
+    const queue=v.reduce((a,x)=>a+x.queue,0);const cong=window.BoxLensCore.congestion.score(v);
     $('#arrInfo').innerHTML=`<div class="grid" style="grid-template-columns:1fr 1fr">${statTile(v.length,'Vessels')}${statTile(queue,'Queue length','var(--warn)')}${statTile(cong,'Congestion score','var('+(cong>50?'--bad':'--warn')+')')}</div>
     <hr><div class="tiny muted">Weather (Open-Meteo Marine)</div>${w?('<div class="card-2"><div class="stat-line"><span>Wave height</span><span class="v">'+w.wave+' m</span></div><div class="stat-line"><span>Wind</span><span class="v">'+w.wind+' kn (gust '+w.gust+')</span></div><div class="stat-line"><span>Visibility</span><span class="v">'+w.visibility+'</span></div><div class="stat-line"><span>Risk</span><span class="badge '+(w.risk==='low'?'ok':w.risk==='medium'?'warn':'bad')+'">'+w.risk+'</span></div></div>'):'No weather data'}
     <hr><div class="tiny muted">Holidays (Nager.Date) — next 60 days</div>${h.length?h.map(x=>'<div class="stat-line"><span>'+esc(x.name)+'</span><span class="v">'+x.date+'</span></div>').join(''):'<div class="muted small">None</div>'}`;
