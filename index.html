@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="BoxLens — container compliance, facility and port intelligence platform. ISO 6346 validation, VGM Method 2, facilities directory, bulk compliance, dashboards and arrivals." />
+<title>BoxLens — Container Compliance & Port Intelligence</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230f766e'/%3E%3Ctext x='50' y='68' font-size='58' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'%3EB%3C/text%3E%3C/svg%3E" />
+<!-- Leaflet for facility map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- ECharts for dashboards -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root{
+  --bg:#f7f9fb; --surface:#ffffff; --surface-2:#f1f5f9; --border:#e2e8f0;
+  --text:#0f172a; --muted:#64748b; --primary:#0f766e; --primary-d:#115e59;
+  --accent:#0891b2; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --info:#2563eb;
+  --ok-bg:#dcfce7; --warn-bg:#fef3c7; --bad-bg:#fee2e2; --info-bg:#dbeafe; --neutral-bg:#e2e8f0;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.06);
+  --shadow-lg:0 10px 25px -5px rgba(15,23,42,.12),0 8px 10px -6px rgba(15,23,42,.08);
+  --radius:10px; --radius-sm:6px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+[data-theme="dark"]{
+  --bg:#0b1220; --surface:#111a2e; --surface-2:#0f172a; --border:#1e293b;
+  --text:#e2e8f0; --muted:#94a3b8; --primary:#14b8a6; --primary-d:#0f766e;
+  --accent:#22d3ee; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa;
+  --ok-bg:#052e16; --warn-bg:#422006; --bad-bg:#450a0a; --info-bg:#082f49; --neutral-bg:#1e293b;
+  --shadow:0 1px 3px rgba(0,0,0,.4); --shadow-lg:0 10px 25px -5px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;font-size:15px;-webkit-font-smoothing:antialiased}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font-family:inherit}
+h1,h2,h3,h4{margin:0 0 .4em;line-height:1.25;color:var(--text)}
+h1{font-size:clamp(1.6rem,4vw,2.2rem)}h2{font-size:clamp(1.3rem,3vw,1.7rem)}h3{font-size:1.15rem}
+p{margin:0 0 .8em}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.tiny{font-size:.75rem}
+.center{text-align:center}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.grid{display:grid;gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.card-2{background:var(--surface-2);border-radius:var(--radius-sm);padding:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.kpi .v{font-size:1.8rem;font-weight:700;line-height:1}
+.kpi .l{color:var(--muted);font-size:.8rem;margin-top:6px;text-transform:uppercase;letter-spacing:.04em}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600;line-height:1.4}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.info{background:var(--info-bg);color:var(--info)}
+.badge.neutral{background:var(--neutral-bg);color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.9rem;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--primary);text-decoration:none}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn.primary:hover{background:var(--primary-d);border-color:var(--primary-d)}
+.btn.sm{padding:5px 10px;font-size:.8rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input,select,textarea{font-family:inherit;font-size:.92rem;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);width:100%}
+textarea{resize:vertical;font-family:var(--mono);font-size:.85rem}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--primary);outline-offset:-1px;border-color:var(--primary)}
+label{display:block;font-size:.82rem;font-weight:600;margin-bottom:4px;color:var(--text)}
+label .req{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:.76rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;background:var(--surface-2)}
+tbody tr:hover{background:var(--surface-2)}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+hr{border:0;border-top:1px solid var(--border);margin:16px 0}
+code{font-family:var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:.85em}
+.alert{padding:10px 14px;border-radius:var(--radius-sm);font-size:.88rem;border-left:4px solid}
+.alert.warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.alert.bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.alert.info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.alert.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.alert.legal{background:var(--warn-bg);color:var(--warn);border-color:var(--warn);font-size:.82rem}
+.tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.prov{font-size:.68rem;color:var(--muted);display:inline-flex;align-items:center;gap:3px}
+.prov::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.prov.ok::before{background:var(--ok)} .prov.warn::before{background:var(--warn)} .prov.bad::before{background:var(--bad)} .prov.info::before{background:var(--info)}
+
+/* ============ LAYOUT ============ */
+.topbar{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow)}
+.topbar-inner{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;max-width:1280px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.1rem;color:var(--text);white-space:nowrap}
+.brand .logo{width:28px;height:28px;border-radius:7px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+.brand .logo span{font-size:16px}
+.nav{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{padding:7px 11px;border-radius:var(--radius-sm);font-size:.88rem;color:var(--muted);font-weight:600;white-space:nowrap}
+.nav a:hover{background:var(--surface-2);color:var(--text);text-decoration:none}
+.nav a.active{background:var(--primary);color:#fff}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.icon-btn:hover{border-color:var(--primary)}
+.budget-pill{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;padding:4px 9px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);cursor:pointer}
+.budget-pill:hover{border-color:var(--primary)}
+.budget-pill .bar{width:40px;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.budget-pill .bar i{display:block;height:100%;background:var(--ok)}
+
+main{padding:20px 0 60px}
+.page{display:none}
+.page.active{display:block;animation:fade .2s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page-head{margin-bottom:16px}
+.page-head .sub{color:var(--muted);font-size:.9rem;margin-top:2px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto}
+.tabs button{padding:9px 14px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap;font-size:.9rem}
+.tabs button.active{color:var(--primary);border-color:var(--primary)}
+.tabs button:hover{color:var(--text)}
+
+.hero{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border-radius:var(--radius);padding:32px 24px;margin-bottom:20px}
+.hero h1{color:#fff}
+.hero p{color:rgba(255,255,255,.92);max-width:640px}
+.hero .btn{background:#fff;color:var(--primary-d);border-color:#fff}
+.hero .btn.outline{background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}
+.hero .btn.outline:hover{border-color:#fff}
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.mod-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
+.mod-card:hover{border-color:var(--primary);box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.mod-card .ic{width:40px;height:40px;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:10px;color:var(--primary)}
+.mod-card h3{margin-bottom:4px}
+.mod-card p{font-size:.85rem;color:var(--muted);margin:0}
+
+.chart{width:100%;height:320px}
+.chart.sm{height:220px}
+.chart.lg{height:380px}
+#map{height:420px;border-radius:var(--radius);border:1px solid var(--border);z-index:1}
+.leaflet-container{background:var(--surface-2)}
+
+.footer{border-top:1px solid var(--border);background:var(--surface);padding:24px 0;color:var(--muted);font-size:.83rem}
+.footer a{color:var(--muted)}
+.footer .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px;max-width:1280px;margin:0 auto;padding:0 16px}
+.disclaimer-strip{background:var(--warn-bg);color:var(--warn);font-size:.78rem;padding:7px 16px;text-align:center;border-bottom:1px solid var(--border)}
+
+/* toast */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:var(--text);color:var(--bg);padding:10px 16px;border-radius:var(--radius-sm);font-size:.85rem;box-shadow:var(--shadow-lg);animation:fade .2s}
+
+/* drawer */
+.drawer{position:fixed;inset:0;z-index:200;display:none}
+.drawer.open{display:block}
+.drawer-bg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.drawer-panel{position:absolute;right:0;top:0;height:100%;width:min(420px,100%);background:var(--surface);box-shadow:var(--shadow-lg);overflow-y:auto;padding:20px}
+
+/* shortcuts help */
+kbd{font-family:var(--mono);font-size:.78rem;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+
+/* RTL */
+[dir="rtl"] .nav a.active{}
+[dir="rtl"] .drawer-panel{right:auto;left:0}
+[dir="rtl"] .topbar-inner{flex-direction:row}
+
+/* mobile */
+.mobile-nav{display:none}
+@media(max-width:860px){
+  .nav{display:none}
+  .mobile-nav{display:flex;align-items:center}
+  .menu-btn{display:flex}
+  #mobileMenu{display:none}
+  #mobileMenu.open{display:block;position:absolute;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow-lg);padding:8px;flex-direction:column}
+  #mobileMenu a{padding:10px 12px;border-radius:var(--radius-sm);color:var(--text);font-weight:600}
+  #mobileMenu a.active{background:var(--primary);color:#fff}
+}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.list{list-style:none;padding:0;margin:0}
+.list li{padding:8px 0;border-bottom:1px solid var(--border)}
+.list li:last-child{border-bottom:0}
+.divider-v{width:1px;height:24px;background:var(--border)}
+.progress{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--primary);transition:width .3s}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty .ic{font-size:40px;margin-bottom:8px;opacity:.4}
+.stat-line{display:flex;justify-content:space-between;font-size:.85rem;padding:4px 0}
+.stat-line .v{font-weight:600}
+.checkbox-row{display:flex;align-items:center;gap:8px;font-size:.88rem}
+.checkbox-row input{width:auto}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="disclaimer-strip" id="disclaimerStrip">
+  ⚠ BoxLens assists with data and calculations only. It does NOT certify a VGM and does not replace the shipper's legal responsibility. Estimates and missing data are never presented as official facts.
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="#/" class="brand" aria-label="BoxLens home"><span class="logo"><span>B</span></span><span>BoxLens</span></a>
+    <nav class="nav" id="mainNav" aria-label="Main navigation"></nav>
+    <div class="grow"></div>
+    <div class="top-actions">
+      <span class="budget-pill" id="budgetPill" title="Provider budget guard" tabindex="0" role="button" aria-label="Provider budget status">
+        <span class="dot" style="background:var(--ok)"></span>
+        <span id="budgetTxt">BIC 98%</span>
+        <span class="bar"><i style="width:98%"></i></span>
+      </span>
+      <button class="icon-btn" id="localeBtn" title="Language (English)" aria-label="Switch language">EN</button>
+      <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle dark/light theme">🌙</button>
+      <div class="mobile-nav">
+        <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">☰</button>
+      </div>
+    </div>
+  </div>
+  <nav id="mobileMenu" aria-label="Mobile navigation"></nav>
+</header>
+
+<main>
+  <div class="wrap" id="app"></div>
+</main>
+
+<footer class="footer">
+  <div class="cols">
+    <div>
+      <div class="brand" style="margin-bottom:8px"><span class="logo"><span>B</span></span><span>BoxLens</span></div>
+      <p style="margin:0">Container compliance, facility &amp; port intelligence. Built on open industry data with honesty-first labelling.</p>
+    </div>
+    <div>
+      <h4 style="font-size:.85rem;text-transform:uppercase;color:var(--text)">Product</h4>
+      <ul class="list">
+        <li><a href="#/check">Check</a></li>
+        <li><a href="#/facilities">Facilities</a></li>
+        <li><a href="#/compliance">Compliance</a></li>
+        <li><a href="#/dashboards">Dashboards</a></li>
+        <li><a href="#/arrivals">Arrivals</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:.85rem;text-transform:uppercase;color:var(--text)">Trust</h4>
+      <ul class="list">
+        <li><a href="#/methodology">Data &amp; Methodology</a></li>
+        <li><a href="#/methodology">Sources &amp; Terms</a></li>
+        <li><a href="#/methodology">Honesty Rules</a></li>
+        <li><a href="#/admin">Provider Status</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:.85rem;text-transform:uppercase;color:var(--text)">Account</h4>
+      <ul class="list">
+        <li><a href="#/workflow">Shipments</a></li>
+        <li><a href="#/settings">Settings</a></li>
+        <li><a href="#/admin">Admin Console</a></li>
+        <li><span class="tiny muted">Demo tenant · Free plan</span></li>
+      </ul>
+    </div>
+  </div>
+  <hr style="max-width:1280px;margin:16px auto">
+  <div class="center tiny">© 2026 BoxLens (demo build). Data sources credited per <a href="#/methodology">DATA_SOURCES</a>. Provider attributions: BIC, aisstream.io, Open-Meteo, Nager.Date, UN/LOCODE. Not affiliated with these providers.</div>
+</footer>
+
+<div id="toast"></div>
+
+<div class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-bg" data-close-drawer></div>
+  <div class="drawer-panel" id="drawerPanel" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+/* =========================================================================
+   BOXLUNS — single-file enterprise demo
+   All data below is SAMPLE/DEMO data for illustration. Real lookups require
+   provider API keys (BIC BoxTech, BIC Codes, BIC Facility Code, aisstream.io,
+   Open-Meteo, Nager.Date). The ISO 6346 check-digit algorithm is real and
+   authoritative; VGM Method 2 arithmetic is real.
+   ========================================================================= */
+const BoxLens = (function(){
+'use strict';
+
+/* ---------- i18n ---------- */
+const I18N = {
+  en:{
+    dir:'ltr', label:'English',
+    nav:{home:'Home',check:'Check',facilities:'Facilities',compliance:'Compliance',workflow:'Workflow',dashboards:'Dashboards',arrivals:'Arrivals',reports:'Reports',methodology:'Data & Method',admin:'Admin',settings:'Settings',api:'API Docs'},
+    c:{validate:'Validate',containerNumber:'Container number',owner:'Owner',tareWeight:'Tare weight',maxGross:'Max gross mass',maxPayload:'Max payload',maxStacking:'Max stacking wt',sizeType:'Size/type',manufacturer:'Manufacturer ID',csc:'CSC plate',lookup:'Look up',manualEntry:'Manual entry',vgm:'VGM (Method 2)',cargoWeight:'Cargo + packing + dunnage',computedVgm:'Computed VGM',declarationSheet:'Declaration sheet (draft)',results:'Results',pass:'Pass',warn:'Warning',fail:'Fail',nodata:'No data',reason:'Reason',download:'Download CSV',upload:'Paste CSV / paste rows',run:'Run check',freshness:'Data age',source:'Source',loading:'Loading…',notFound:'No record found',notFoundMsg:'This container is not in our sample database. In production BoxLens queries BIC BoxTech; here you can add manual (unverified) values.'}
+  },
+  ar:{
+    dir:'rtl', label:'العربية',
+    nav:{home:'الرئيسية',check:'فحص',facilities:'المنشآت',compliance:'الامتثال',workflow:'سير العمل',dashboards:'لوحات العرض',arrivals:'الوصول',reports:'التقارير',methodology:'البيانات والمنهج',admin:'الإدارة',settings:'الإعدادات',api:'وثائق API'},
+    c:{validate:'تحقق',containerNumber:'رقم الحاوية',owner:'المالك',tareWeight:'وزن الفارغة',maxGross:'أقصى وزن إجمالي',maxPayload:'أقصى حمولة',maxStacking:'أقصى وزن تكديس',sizeType:'الحجم/النوع',manufacturer:'معرّف الصانع',csc:'لوحة CSC',lookup:'بحث',manualEntry:'إدخال يدوي',vgm:'VGM (الطريقة 2)',cargoWeight:'البضاعة + التعبئة + التثبيت',computedVgm:'VGM المحسوب',declarationSheet:'ورقة البيان (مسودة)',results:'النتائج',pass:'ناجح',warn:'تحذير',fail:'فشل',nodata:'لا بيانات',reason:'السبب',download:'تنزيل CSV',upload:'لصق CSV',run:'تشغيل الفحص',freshness:'عمر البيانات',source:'المصدر',loading:'جارٍ التحميل…',notFound:'لا يوجد سجل',notFoundMsg:'هذه الحاوية ليست في قاعدة بيانات العينة. في الإنتاج يستعلم BoxLens من BIC BoxTech؛ هنا يمكنك إدخال قيم يدوية (غير موثقة).'}
+  }
+};
+
+/* ---------- state ---------- */
+const state = {
+  locale:'en',
+  theme:localStorage.getItem('bl-theme')||'light',
+  shipments:JSON.parse(localStorage.getItem('bl-shipments')||'[]'),
+  watchlists:JSON.parse(localStorage.getItem('bl-watchlists')||'[]'),
+  audit:JSON.parse(localStorage.getItem('bl-audit')||'[]'),
+  manual:JSON.parse(localStorage.getItem('bl-manual')||'{}'),
+  providerBudget:{bic:{used:127,cap:6000,window:'24h'},ais:{used:4120,cap:10000,window:'24h'},meteo:{used:88,cap:10000,window:'24h'},nager:{used:12,cap:1000,window:'24h'}},
+  providerStatus:{bic:{state:'ok',latency:240},ais:{state:'ok',latency:1800},meteo:{state:'warn',latency:1200},nager:{state:'ok',latency:90}},
+  route:'/',
+  charts:{},
+};
+function t(key){const parts=key.split('.');let v=I18N[state.locale];for(const p of parts){v=v&&v[p]}return v||key}
+function save(key,val){localStorage.setItem('bl-'+key,JSON.stringify(val))}
+function audit(action,detail){state.audit.unshift({ts:new Date().toISOString(),action,detail:detail||''});if(state.audit.length>200)state.audit.length=200;save('audit',state.audit)}
+
+/* ---------- ISO 6346 (real algorithm) ---------- */
+const LETTER_VALUES={};let _n=10;for(let c=65;c<=90;c++){const ch=String.fromCharCode(c);if(_n%11===0)_n++;if(_n%11===0)_n++;LETTER_VALUES[ch]=_n;_n++}
+function iso6346CheckDigit(id){
+  if(!/^[A-Z]{4}\d{6}$/.test(id))return null;
+  let sum=0;for(let i=0;i<10;i++){const ch=id[i];const v=ch>='0'&&ch<='9'?+ch:LETTER_VALUES[ch];sum+=v*Math.pow(2,i)}
+  return (sum%11)%10;
+}
+function validateContainer(num){
+  const id=String(num||'').toUpperCase().replace(/\s+/g,'');
+  const result={input:num,normalized:id,valid:false,checkDigit:null,expected:null,errors:[]};
+  if(id.length!==11){result.errors.push('Must be 11 characters (4 letters + 6 digits + 1 check digit)');return result}
+  if(!/^[A-Z]{4}/.test(id))result.errors.push('First 4 characters must be letters (owner code)');
+  if(!/^\d{7}$/.test(id.slice(4)))result.errors.push('Last 7 characters must be digits');
+  if(result.errors.length)return result;
+  const expected=iso6346CheckDigit(id.slice(0,10));
+  result.checkDigit=+id[10];result.expected=expected;
+  result.valid=(result.checkDigit===expected);
+  if(!result.valid)result.errors.push('Check digit mismatch: expected '+expected+', got '+result.checkDigit);
+  return result;
+}
+// golden test cases (will be asserted on load) — CSQU3054383 anchors to the
+// worked example in the Wikipedia ISO 6346 article (check digit 3).
+const GOLDEN=[
+  {id:'CSQU3054383',valid:true},
+  {id:'MSKU1234565',valid:true},
+  {id:'TCNU4852000',valid:true},
+  {id:'ONEU5678907',valid:true},
+  {id:'CMAU3456787',valid:true},
+  {id:'MSCU6639871',valid:false},  // wrong check digit (correct is 0)
+  {id:'MSCU66398',valid:false},    // too short
+  {id:'12345678901',valid:false},  // letters missing
+];
+function runGoldenTests(){const fails=[];for(const g of GOLDEN){const r=validateContainer(g.id);if(r.valid!==g.valid)fails.push(g.id+' expected '+g.valid+' got '+r.valid)}return fails}
+
+/* ---------- sample data ---------- */
+const OWNERS={
+  'CSQU':{code:'CSQU',name:'CSAV (Compañía Sud Americana de Vapores)',country:'CL',city:'Valparaíso',contact:'www.csav.com'},
+  'MSKU':{code:'MSKU',name:'Mediterranean Shipping Company S.A.',country:'CH',city:'Geneva',contact:'www.msc.com'},
+  'MSCU':{code:'MSCU',name:'Mediterranean Shipping Company S.A.',country:'CH',city:'Geneva',contact:'www.msc.com'},
+  'TCNU':{code:'TCNU',name:'Tropical Container Leasing',country:'US',city:'Miami',contact:'www.tcl.com'},
+  'ONEU':{code:'ONEU',name:'Ocean Network Express',country:'SG',city:'Singapore',contact:'www.one-line.com'},
+  'CMAU':{code:'CMAU',name:'CMA CGM S.A.',country:'FR',city:'Marseille',contact:'www.cma-cgm.com'},
+  'MAEU':{code:'MAEU',name:'A.P. Moller-Maersk',country:'DK',city:'Copenhagen',contact:'www.maersk.com'},
+  'CCLU':{code:'CCLU',name:'China COSCO Shipping',country:'CN',city:'Shanghai',contact:'www.cosco.com'},
+  'EMCU':{code:'EMCU',name:'Emirates Logistics',country:'AE',city:'Dubai',contact:'www.emirates-logistics.ae'},
+  'HLCU':{code:'HLCU',name:'Hapag-Lloyd AG',country:'DE',city:'Hamburg',contact:'www.hapag-lloyd.com'},
+  'YMLU':{code:'YMLU',name:'Yang Ming Marine Transport',country:'TW',city:'Keelung',contact:'www.yangming.com'},
+};
+const SIZE_TYPES={
+  '22G1':'20ft General Purpose (8\'6")','22G0':'20ft General Purpose (8\'6")','25G1':'20ft General Purpose (9\'6")',
+  '42G1':'40ft General Purpose (8\'6")','45G1':'40ft General Purpose (9\'6") High Cube','44G1':'40ft General Purpose (9\'6") High Cube',
+  '22T1':'20ft Tank','27T1':'20ft Tank','25T1':'20ft Tank',
+  '22R1':'20ft Reefer','45R1':'40ft Reefer High Cube','42R1':'40ft Reefer',
+  '22P1':'20ft Flatrack','42P1':'40ft Flatrack','22V1':'20ft Ventilated','42V1':'40ft Ventilated',
+  'L5G1':'45ft General Purpose High Cube','45G0':'40ft High Cube',
+};
+const CONTAINERS={
+  'CSQU3054383':{sizeType:'42G1',tare:3700,maxGross:30480,maxPayload:26780,maxStacking:192000,manufacturer:'CIMC',csc:{plate:'CSC-ACE-U',nextInspection:'2027-04',approved:true},special:null,source:'BIC BoxTech',fetchedAt:'2026-11-22',quality:'ok'},
+  'MSCU6639870':{sizeType:'42G1',tare:3700,maxGross:30480,maxPayload:26780,maxStacking:192000,manufacturer:'CIMC',csc:{plate:'CSC-ACE-U',nextInspection:'2027-04',approved:true},special:null,source:'BIC BoxTech',fetchedAt:'2026-11-20',quality:'ok'},
+  'MSKU1234565':{sizeType:'22G1',tare:2200,maxGross:30480,maxPayload:28280,maxStacking:192000,manufacturer:'DongFang',csc:{plate:'CSC-ACE-U',nextInspection:'2026-09',approved:true},special:null,source:'BIC BoxTech',fetchedAt:'2026-11-18',quality:'ok'},
+  'TCNU4852000':{sizeType:'45R1',tare:4130,maxGross:34000,maxPayload:29870,maxStacking:192000,manufacturer:'Mitsubishi',csc:{plate:'CSC-ACE-U',nextInspection:'2028-01',approved:true},special:{type:'reefer',setpointTemp:'-18°C',humidity:'65%'},source:'BIC BoxTech',fetchedAt:'2026-11-22',quality:'ok'},
+  'ONEU5678907':{sizeType:'22T1',tare:3650,maxGross:30480,maxPayload:26830,maxStacking:150000,manufacturer:'Welfit Odegaard',csc:{plate:'CSC-ACE-U',nextInspection:'2027-11',approved:true},special:{type:'tank',testPressure:'4.5 bar',lastTest:'2025-03'},source:'BIC BoxTech',fetchedAt:'2026-11-21',quality:'ok'},
+  'CMAU3456787':{sizeType:'42G1',tare:3850,maxGross:34800,maxPayload:30950,maxStacking:192000,manufacturer:'CIMC',csc:{plate:'CSC-ACE-U',nextInspection:'2026-02',approved:false},special:null,source:'BIC BoxTech',fetchedAt:'2026-10-15',quality:'stale'},
+  'MAEU1234567':{sizeType:'45G1',tare:3970,maxGross:34800,maxPayload:30830,maxStacking:192000,manufacturer:'Singamas',csc:{plate:'CSC-ACE-U',nextInspection:'2029-06',approved:true},special:{type:'highcube'},source:'BIC BoxTech',fetchedAt:'2026-11-22',quality:'ok'},
+  'CCLU9876547':{sizeType:'22G1',tare:2300,maxGross:30480,maxPayload:28180,maxStacking:192000,manufacturer:'CIMC',csc:{plate:'CSC-ACE-U',nextInspection:'2027-08',approved:true},special:null,source:'BIC BoxTech',fetchedAt:'2026-11-19',quality:'ok'},
+  'EMCU1112229':{sizeType:'42P1',tare:5200,maxGross:45000,maxPayload:39800,maxStacking:150000,manufacturer:'Mitsubishi',csc:{plate:'CSC-ACE-U',nextInspection:'2027-12',approved:true},special:{type:'flatrack',collapsible:true},source:'BIC BoxTech',fetchedAt:'2026-11-23',quality:'ok'},
+  'HLCU7654320':{sizeType:'42G1',tare:3880,maxGross:34800,maxPayload:30920,maxStacking:192000,manufacturer:'CIMC',csc:{plate:'CSC-ACE-U',nextInspection:'2026-05',approved:false},special:null,source:'BIC BoxTech',fetchedAt:'2026-09-01',quality:'stale'},
+  'YMLU3344554':{sizeType:'42R1',tare:4250,maxGross:34000,maxPayload:29750,maxStacking:192000,manufacturer:'Mitsubishi',csc:{plate:'CSC-ACE-U',nextInspection:'2028-07',approved:true},special:{type:'reefer',setpointTemp:'2°C'},source:'BIC BoxTech',fetchedAt:'2026-11-22',quality:'ok'},
+};
+
+const FACILITIES=[
+  {code:'DEHAM',name:'Hamburger Hafen (Port of Hamburg)',type:'terminal',country:'DE',locode:'DEHAM',owner:'HHLA',address:'Bei den St. Pauli-Landungsbrücken 3, 20359 Hamburg',lat:53.5436,lng:9.9391,geofence:[[[53.55,9.90],[53.55,9.99],[53.51,9.99],[53.51,9.90]]]},
+  {code:'NLRTM',name:'Port of Rotterdam',type:'terminal',country:'NL',locode:'NLRTM',owner:'Port of Rotterdam Authority',address:'Wilhelminakade 909, 3072 AP Rotterdam',lat:51.9445,lng:4.1377},
+  {code:'AEJEA',name:'Jebel Ali Port',type:'terminal',country:'AE',locode:'AEJEA',owner:'DP World',address:'Jebel Ali, Dubai',lat:25.0125,lng:55.0655},
+  {code:'SGSIN',name:'Port of Singapore (PSA)',type:'terminal',country:'SG',locode:'SGSIN',owner:'PSA International',address:'15 HarbourFront Ave, Singapore',lat:1.2640,lng:103.8408},
+  {code:'CNSHA',name:'Shanghai Yangshan Deep Water Port',type:'terminal',country:'CN',locode:'CNSHA',owner:'SIPG',address:'Yangshan, Shanghai',lat:30.6333,lng:122.0667},
+  {code:'USLAX',name:'Port of Los Angeles',type:'terminal',country:'US',locode:'USLAX',owner:'POLA',address:'425 S Palos Verdes St, San Pedro, CA',lat:33.7447,lng:-118.2723},
+  {code:'USNYC',name:'Port of New York & New Jersey',type:'terminal',country:'US',locode:'USNYC',owner:'PANYNJ',address:'4 World Trade Center, NY',lat:40.6670,lng:-74.0411},
+  {code:'BEANR',name:'Port of Antwerp-Bruges',type:'terminal',country:'BE',locode:'BEANR',owner:'Port of Antwerp-Bruges',address:'Lange Gasthuisstraat 13, Antwerp',lat:51.3083,lng:4.3140},
+  {code:'ESBCN',name:'Port of Barcelona',type:'terminal',country:'ES',locode:'ESBCN',owner:'Port de Barcelona',address:'World Trade Center, Barcelona',lat:41.3496,lng:2.1700},
+  {code:'INMUN',name:'Jawaharlal Nehru Port (JNPT)',type:'terminal',country:'IN',locode:'INMUN',owner:'JNPT',address:'Nhava Sheva, Maharashtra',lat:18.9500,lng:72.9500},
+  {code:'KRPUS',name:'Busan New Port',type:'terminal',country:'KR',locode:'KRPUS',owner:'BPA',address:'Busan',lat:35.0790,lng:128.8360},
+  {code:'JPYOK',name:'Port of Yokohama',type:'terminal',country:'JP',locode:'JPYOK',owner:'Port of Yokohama',address:'Yokohama',lat:35.4500,lng:139.6500},
+  {code:'DEBRV',name:'Bremerhaven Container Terminal',type:'terminal',country:'DE',locode:'DEBRV',owner:'NTB',address:'Containerhafen, Bremerhaven',lat:53.5580,lng:8.5630},
+  {code:'FRMRS',name:'Port of Marseille (Fos)',type:'terminal',country:'FR',locode:'FRMRS',owner:'Port of Marseille',address:'Marseille',lat:43.2950,lng:5.3760},
+  {code:'GBFXT',name:'Port of Felixstowe',type:'terminal',country:'GB',locode:'GBFXT',owner:'Hutchison Ports',address:'Felixstowe, Suffolk',lat:51.9500,lng:1.3167},
+  // depots
+  {code:'DEDUS',name:'Hamburg Container Depot',type:'depot',country:'DE',owner:'EUROGATE',address:'Schumacherwerder 15, 21129 Hamburg',lat:53.5032,lng:9.8928},
+  {code:'AEDXB',name:'Jebel Ali Container Depot',type:'depot',country:'AE',owner:'DP World',address:'Jebel Ali Free Zone, Dubai',lat:25.0080,lng:55.0520},
+  {code:'SGTPW',name:'Tuas Depot',type:'depot',country:'SG',owner:'PSA',address:'Tuas, Singapore',lat:1.3380,lng:103.6400},
+];
+
+const VESSELS=[
+  {name:'MSC Isabella',imo:9665706,mmsi:636016425,type:'container',capacity:19224,operator:'MSC',lat:53.45,lng:9.55,speed:12.4,heading:240,status:'approaching',port:'DEHAM',eta:'2026-11-24T08:00:00Z',queue:0,ageMin:4},
+  {name:'Maersk Edmonton',imo:9693614,mmsi:219018000,type:'container',capacity:18340,operator:'Maersk',lat:51.92,lng:3.85,speed:0.0,heading:0,status:'waiting',port:'NLRTM',eta:'2026-11-25T14:00:00Z',queue:5,ageMin:7},
+  {name:'CMA CGM Marco Polo',imo:9454436,mmsi:228366900,type:'container',capacity:16022,operator:'CMA CGM',lat:25.10,lng:55.10,speed:8.2,heading:70,status:'alongside',port:'AEJEA',eta:'2026-11-23T00:00:00Z',queue:0,ageMin:2},
+  {name:'Ever Given',imo:9811000,mmsi:431301000,type:'container',capacity:20124,operator:'Evergreen',lat:1.21,lng:103.78,speed:15.1,heading:285,status:'approaching',port:'SGSIN',eta:'2026-11-26T06:00:00Z',queue:2,ageMin:5},
+  {name:'ONE Innovation',imo:9805240,mmsi:431659000,type:'container',capacity:14000,operator:'ONE',lat:30.50,lng:122.20,speed:11.0,heading:180,status:'approaching',port:'CNSHA',eta:'2026-11-25T09:00:00Z',queue:3,ageMin:6},
+  {name:'Hapag-Lloyd Berlin',imo:9501369,mmsi:218389000,type:'container',capacity:13169,operator:'Hapag-Lloyd',lat:33.70,lng:-118.30,speed:0.0,heading:0,status:'alongside',port:'USLAX',eta:'2026-11-22T00:00:00Z',queue:0,ageMin:3},
+  {name:'OOCL Hong Kong',imo:9776171,mmsi:477553000,type:'container',capacity:21413,operator:'OOCL',lat:40.62,lng:-74.07,speed:9.5,heading:120,status:'waiting',port:'USNYC',eta:'2026-11-26T18:00:00Z',queue:8,ageMin:9},
+  {name:'Cosco Shipping Universe',imo:9795610,mmsi:414650000,type:'container',capacity:21237,operator:'COSCO',lat:51.30,lng:4.20,speed:13.2,heading:80,status:'approaching',port:'BEANR',eta:'2026-11-24T22:00:00Z',queue:1,ageMin:5},
+];
+
+const HOLIDAYS=[
+  {date:'2026-12-25',country:'DE',name:'Christmas Day'},{date:'2026-12-25',country:'NL',name:'Christmas Day'},
+  {date:'2026-12-25',country:'US',name:'Christmas Day'},{date:'2026-12-25',country:'SG',name:'Christmas Day'},
+  {date:'2026-12-25',country:'GB',name:'Christmas Day'},{date:'2026-12-25',country:'FR',name:'Christmas Day'},
+  {date:'2026-12-26',country:'GB',name:'Boxing Day'},{date:'2027-01-01',country:'DE',name:'New Year\'s Day'},
+  {date:'2027-01-01',country:'NL',name:'New Year\'s Day'},{date:'2027-01-01',country:'US',name:"New Year's Day"},
+  {date:'2026-12-02',country:'AE',name:'National Day'},{date:'2026-12-03',country:'AE',name:'National Day holiday'},
+  {date:'2027-02-07',country:'SG',name:'Chinese New Year'},{date:'2027-02-08',country:'SG',name:'Chinese New Year (Day 2)'},
+  {date:'2027-01-26',country:'AU',name:'Australia Day'},{date:'2026-12-23',country:'JP',name:"Emperor's Birthday"},
+];
+
+const WEATHER={ // sample marine snapshot per port
+  'DEHAM':{wave:1.8,wind:22,gust:34,visibility:'moderate',risk:'low'},
+  'NLRTM':{wave:1.4,wind:18,gust:28,visibility:'good',risk:'low'},
+  'AEJEA':{wave:0.8,wind:12,gust:18,visibility:'good',risk:'low'},
+  'SGSIN':{wave:1.2,wind:8,gust:14,visibility:'good',risk:'low'},
+  'CNSHA':{wave:2.4,wind:30,gust:45,visibility:'poor',risk:'medium'},
+  'USLAX':{wave:1.5,wind:14,gust:20,visibility:'good',risk:'low'},
+  'USNYC':{wave:1.9,wind:25,gust:38,visibility:'moderate',risk:'low'},
+  'BEANR':{wave:1.6,wind:20,gust:30,visibility:'good',risk:'low'},
+  'ESBCN':{wave:1.1,wind:16,gust:24,visibility:'good',risk:'low'},
+  'INMUN':{wave:1.7,wind:18,gust:28,visibility:'moderate',risk:'low'},
+  'KRPUS':{wave:1.3,wind:14,gust:22,visibility:'good',risk:'low'},
+  'JPYOK':{wave:1.0,wind:10,gust:16,visibility:'good',risk:'low'},
+  'DEBRV':{wave:1.5,wind:19,gust:29,visibility:'moderate',risk:'low'},
+  'FRMRS':{wave:0.9,wind:15,gust:22,visibility:'good',risk:'low'},
+  'GBFXT':{wave:1.7,wind:24,gust:36,visibility:'moderate',risk:'low'},
+};
+
+const RULES=[
+  {id:'R1',name:'Invalid check digit',severity:'fail',applies:'all',desc:'Container number fails ISO 6346 check-digit verification.'},
+  {id:'R2',name:'Overweight vs max gross',severity:'fail',applies:'hasWeight',desc:'VGM exceeds the container\'s max gross mass.'},
+  {id:'R3',name:'Cargo exceeds max payload',severity:'fail',applies:'hasWeight',desc:'Cargo + packing weight exceeds the container\'s max payload.'},
+  {id:'R4',name:'Exceeds stacking limit',severity:'warn',applies:'hasStack',desc:'Stacked weight approaches or exceeds max stacking weight.'},
+  {id:'R5',name:'Size/type mismatch',severity:'warn',applies:'hasSizeType',desc:'Declared size/type differs from registered size-type.'},
+  {id:'R6',name:'CSC plate expired',severity:'warn',applies:'hasSpec',desc:'CSC plate inspection is overdue or not approved.'},
+  {id:'R7',name:'Owner mismatch',severity:'warn',applies:'hasOwner',desc:'Declared owner code does not match registered owner.'},
+  {id:'R8',name:'Missing data',severity:'nodata',applies:'all',desc:'No technical record found for this container.'},
+];
+
+/* ---------- helpers ---------- */
+function el(html){const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstElementChild}
+function $(sel,root){return (root||document).querySelector(sel)}
+function $all(sel,root){return Array.from((root||document).querySelectorAll(sel))}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(n,u){const w=state.locale==='ar';const v=Number(n||0).toLocaleString(state.locale,{maximumFractionDigits:1});return v+(u?' '+u:'')}
+function daysAgo(iso){if(!iso)return null;const d=(Date.now()-new Date(iso).getTime())/86400000;return d<1?'<1d':Math.floor(d)+'d'}
+function qualityBadge(q){const m={ok:['ok','OK'],partial:['warn','Partial'],missing:['bad','Missing'],stale:['warn','Stale'],conflict:['bad','Conflict']};const c=m[q]||['neutral','—'];return '<span class="badge '+c[0]+'">'+c[1]+'</span>'}
+function provBadge(src,q,age){return '<span class="prov '+(q==='ok'?'ok':q==='stale'?'warn':q==='partial'?'warn':q==='missing'?'bad':'info')+'">'+esc(src)+(age?' · '+age:'')+'</span>'}
+function toast(msg){const d=el('<div class="toast">'+esc(msg)+'</div>');$('#toast').appendChild(d);setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),200)},2400)}
+function csvParse(text){const rows=[];const lines=text.replace(/\r/g,'').split('\n').filter(l=>l.trim());for(const l of lines){const cells=[];let cur='',inq=false;for(let i=0;i<l.length;i++){const c=l[i];if(c==='"'){if(inq&&l[i+1]==='"'){cur+='"';i++}else inq=!inq}else if(c===','&&!inq){cells.push(cur);cur=''}else cur+=c}cells.push(cur);rows.push(cells)}return rows}
+function csvBuild(rows){return rows.map(r=>r.map(c=>{c=String(c==null?'':c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(',')).join('\n')}
+function download(name,content,type){const blob=new Blob([content],{type:type||'text/plain'});const url=URL.createObjectURL(blob);const a=el('<a></a>');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+
+return {
+  state,t,I18N,OWNERS,SIZE_TYPES,CONTAINERS,FACILITIES,VESSELS,HOLIDAYS,WEATHER,RULES,GOLDEN,
+  iso6346CheckDigit,validateContainer,runGoldenTests,LETTER_VALUES,
+  el,$,$all,esc,fmt,daysAgo,qualityBadge,provBadge,toast,csvParse,csvBuild,download,save,audit
+};
+})();
+</script>
+<!-- MODULES will be injected by app.js below -->
+<script>
+/* =====================================================================
+   APP ENTRY — routing, navigation, page renderers, charts, map
+   ===================================================================== */
+(function(){
+const B = BoxLens;
+const {state,t,I18N,el,$,$all,esc,fmt,daysAgo,qualityBadge,provBadge,toast,csvParse,csvBuild,download,save,audit} = B;
+
+/* ---------- chart theming ---------- */
+function chartTheme(){
+  const dark = state.theme==='dark';
+  return {bg:dark?'#111a2e':'#ffffff',text:dark?'#e2e8f0':'#0f172a',axis:dark?'#64748b':'#94a3b8',
+    palette:['#0f766e','#0891b2','#d97706','#dc2626','#2563eb','#7c3aed','#db2777','#65a30d']};
+}
+function chartInit(id,opt){
+  const node=document.getElementById(id);if(!node)return null;
+  if(B.state.charts[id]){try{B.state.charts[id].dispose()}catch(e){}}
+  const th=chartTheme();
+  const baseOpt=Object.assign({},opt);
+  // inject theme defaults
+  baseOpt.color=th.palette;
+  baseOpt.backgroundColor=th.bg;
+  baseOpt.textStyle=Object.assign({color:th.text},baseOpt.textStyle||{});
+  if(baseOpt.title)baseOpt.title.textStyle={color:th.text,fontSize:14};
+  if(baseOpt.legend)baseOpt.legend.textStyle={color:th.text};
+  if(baseOpt.tooltip)baseOpt.tooltip.backgroundColor=darkSafe(th.bg),baseOpt.tooltip.textStyle={color:th.text};
+  if(baseOpt.xAxis){(Array.isArray(baseOpt.xAxis)?baseOpt.xAxis:[baseOpt.xAxis]).forEach(a=>{a.axisLine={lineStyle:{color:th.axis}};a.axisLabel={color:th.axis};a.splitLine={lineStyle:{color:darkSafe(th.border||'#1e293b')}}})}
+  if(baseOpt.yAxis){(Array.isArray(baseOpt.yAxis)?baseOpt.yAxis:[baseOpt.yAxis]).forEach(a=>{a.axisLine={lineStyle:{color:th.axis}};a.axisLabel={color:th.axis};a.splitLine={lineStyle:{color:th.border||'#1e293b'}}})}
+  const c=echarts.init(node,null,{renderer:'canvas'});
+  c.setOption(baseOpt);
+  B.state.charts[id]=c;
+  return c;
+}
+function darkSafe(c){return c}
+
+/* ---------- routing ---------- */
+const ROUTES={
+  '/':renderHome,'/check':renderCheck,'/facilities':renderFacilities,'/compliance':renderCompliance,
+  '/workflow':renderWorkflow,'/dashboards':renderDashboards,'/arrivals':renderArrivals,'/reports':renderReports,
+  '/methodology':renderMethodology,'/admin':renderAdmin,'/settings':renderSettings,'/api':renderApi
+};
+function navItems(){return ['/','/check','/facilities','/compliance','/workflow','/dashboards','/arrivals','/reports','/methodology','/admin','/api','/settings']}
+
+function buildNav(){
+  const nav=$('#mainNav');const mob=$('#mobileMenu');nav.innerHTML='';mob.innerHTML='';
+  for(const r of navItems()){
+    const label=t('nav.'+r.slice(1).replace('/','')||'home')||r.replace('/','')||'Home';
+    const a=el('<a href="#'+r+'" data-route="'+r+'">'+esc(label)+'</a>');
+    nav.appendChild(a);
+    const m=el('<a href="#'+r+'" data-route="'+r+'">'+esc(label)+'</a>');
+    mob.appendChild(m);
+  }
+}
+function setActiveNav(route){
+  $all('#mainNav a, #mobileMenu a').forEach(a=>a.classList.toggle('active',a.dataset.route===route));
+  $('#mobileMenu')&&$('#mobileMenu').classList.remove('open');
+}
+function route(){
+  // dispose charts
+  Object.values(B.state.charts).forEach(c=>{try{c.dispose()}catch(e){}});
+  B.state.charts={};
+  const hash=location.hash.replace(/^#/,'')||'/';
+  const route=('/'+hash.split('/').slice(1).join('/').replace(/^\/?/,'')).replace('//','/');
+  const clean='/'+hash.replace(/^\//,'').split('/')[0];
+  const fn=ROUTES[clean]||ROUTES['/'];
+  state.route=clean;
+  const app=$('#app');
+  app.innerHTML='';
+  window.scrollTo(0,0);
+  fn(app);
+  setActiveNav(clean);
+  // focus main for a11y
+  app.setAttribute('tabindex','-1');app.focus({preventScroll:true});
+}
+window.addEventListener('hashchange',route);
+
+/* ---------- shell helpers ---------- */
+function pageHead(title,sub,extra){
+  return '<div class="page-head spread"><div><h1>'+esc(title)+'</h1>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(extra||'')+'</div>';
+}
+function legalBanner(){return '<div class="alert legal" role="status">⚠ BoxLens assists only — no VGM certification, no container-level tracking. Estimates and missing data are labelled, never presented as official facts.</div>'}
+function statTile(v,l,accent){return '<div class="kpi"><div class="v" style="color:'+(accent||'var(--primary)')+'">'+v+'</div><div class="l">'+l+'</div></div>'}
+function emptyState(ic,msg){return '<div class="empty"><div class="ic">'+ic+'</div><div>'+msg+'</div></div>'}
+
+/* ================= HOME ================= */
+function renderHome(app){
+  app.innerHTML = `
+  ${legalBanner()}
+  <section class="hero">
+    <div class="row" style="align-items:flex-start">
+      <div class="grow">
+        <h1>Container compliance, facility &amp; port intelligence — in one place.</h1>
+        <p>BoxLens helps forwarders, shippers, agents, terminals, depots and hauliers avoid rejected gate-ins, weight errors, EDI exceptions and surprise delays — built on open industry data with honesty-first labelling.</p>
+        <div class="row" style="margin-top:12px">
+          <a class="btn" href="#/check">▶ Check a container</a>
+          <a class="btn outline" href="#/dashboards">View dashboards</a>
+          <a class="btn outline" href="#/methodology">How it works</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px">
+    ${statTile(fmt(B.state.providerBudget.bic.cap-B.state.providerBudget.bic.used),'BIC calls left today')}
+    ${statTile(Object.keys(B.CONTAINERS).length,'Sample containers')}
+    ${statTile(B.FACILITIES.length,'Facilities mapped')}
+    ${statTile(B.VESSELS.length,'Vessels tracked')}
+  </div>
+  <h2 style="margin-bottom:10px">Six modules</h2>
+  <div class="mod-grid">
+    ${modCard('🔍','Check','ISO 6346 validation, owner &amp; technical/safety lookup, VGM Method 2 assistant with declaration sheet.','#/check')}
+    ${modCard('🏭','Facilities','Terminal &amp; depot directory, facility code translator, geofence map, nearest drop-off.','#/facilities')}
+    ${modCard('📋','Compliance','Bulk CSV upload, rule engine, data-gap &amp; coverage reports, exports.','#/compliance')}
+    ${modCard('⚙','Workflow','Saved shipments, watchlists, alerts, scheduled reports.','#/workflow')}
+    ${modCard('📊','Dashboards','Compliance, coverage, gate/yard, facility map, arrivals, executive summary.','#/dashboards')}
+    ${modCard('🚢','Arrivals','Vessel approach, anchorage, alongside, congestion score, weather, holidays.','#/arrivals')}
+  </div>
+  <hr>
+  <div class="grid" style="grid-template-columns:1fr 1fr;gap:24px">
+    <div class="card">
+      <h3>Provider budget guard</h3>
+      <p class="muted small">A central quota manager keeps total calls to BIC APIs as low as possible (a fair-use requirement, not an optimisation). It coalesces duplicate in-flight requests, caches aggressively, and serves stale data with a visible badge when a provider is slow or down.</p>
+      <div id="homeBudget"></div>
+    </div>
+    <div class="card">
+      <h3>Provenance on every record</h3>
+      <p class="muted small">Every value carries <code>source</code>, <code>fetched_at</code>, <code>source_version</code> and a quality flag (<span class="badge ok">OK</span> <span class="badge warn">Partial</span> <span class="badge bad">Missing</span> <span class="badge warn">Stale</span> <span class="badge bad">Conflict</span>).</p>
+      <div id="homeGolden"></div>
+    </div>
+  </div>`;
+  audit('view','home');
+  // budget bars
+  const hb=$('#homeBudget');
+  hb.innerHTML = Object.entries(B.state.providerBudget).map(([k,v])=>{
+    const pct=Math.round(100*(v.cap-v.used)/v.cap);
+    const col=pct>50?'var(--ok)':pct>20?'var(--warn)':'var(--bad)';
+    return '<div style="margin-bottom:8px"><div class="stat-line"><span>'+k.toUpperCase()+' · '+v.window+'</span><span class="v">'+(v.cap-v.used)+' / '+v.cap+' left ('+pct+'%)</span></div><div class="progress"><i style="width:'+pct+'%;background:'+col+'"></i></div></div>';
+  }).join('');
+  // golden test runner
+  const fails=B.runGoldenTests();
+  $('#homeGolden').innerHTML = '<div class="alert '+(fails.length?'bad':'ok')+'">'+(fails.length?('Self-test failures: '+fails.join(', ')):'✓ ISO 6346 golden tests passed ('+B.GOLDEN.length+' cases)')+'</div>';
+}
+
+function modCard(ic,title,desc,href){return '<a href="'+href+'" class="mod-card" style="text-decoration:none;color:inherit"><div class="ic">'+ic+'</div><h3>'+title+'</h3><p>'+desc+'</p></a>'}
+
+/* ================= CHECK ================= */
+function renderCheck(app){
+  const recent = (state.audit.filter(a=>a.action==='lookup').slice(0,5));
+  app.innerHTML = `
+  ${pageHead('Check','ISO 6346 validation · owner &amp; technical lookup · VGM Method 2 assistant',`<button class="btn sm" id="checkShortcutHelp" title="Keyboard: press / then c">⌨ Shortcuts</button>`)}
+  <div class="grid" style="grid-template-columns:minmax(0,360px) 1fr">
+    <div class="col">
+      <div class="card">
+        <label>Container number <span class="req">*</span></label>
+        <div class="row">
+          <input id="cnInput" class="mono" placeholder="e.g. CSQU3054383" maxlength="11" autocomplete="off" autocapitalize="characters" />
+          <button class="btn primary" id="cnValidate">${t('c.validate')}</button>
+        </div>
+        <div id="cnResult" style="margin-top:10px"></div>
+        <hr>
+        <div class="tiny muted">Try: <a href="#" class="sample">CSQU3054383</a>, <a href="#" class="sample">TCNU4852000</a>, <a href="#" class="sample">ONEU5678907</a>, <a href="#" class="sample">CMAU3456787</a> (stale), <a href="#" class="sample">MSCU6639871</a> (invalid)</div>
+      </div>
+      <div class="card">
+        <label>Owner code (4 letters)</label>
+        <input id="ownerInput" class="mono" maxlength="4" placeholder="e.g. MSCU" />
+        <button class="btn sm" id="ownerLookup" style="margin-top:8px">Look up owner (BIC Codes)</button>
+        <div id="ownerResult" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" id="specCard"><div class="empty"><div class="ic">📦</div>Enter a container number to see owner, size/type, weights, CSC and special-equipment data.</div></div>
+      <div class="card" id="vgmCard" style="display:none"></div>
+      <div class="card">
+        <h3>Recent lookups</h3>
+        ${recent.length?('<div class="table-wrap"><table><thead><tr><th>Container</th><th>Result</th><th>When</th></tr></thead><tbody>'+recent.map(a=>'<tr><td class="mono">'+esc((a.detail||'').split('|')[0])+'</td><td>'+esc((a.detail||'').split('|')[1]||'')+'</td><td class="tiny muted">'+daysAgo(a.ts.slice(0,10))+' ago</td></tr>').join('')+'</tbody></table></div>'):emptyState('🕒','No lookups yet in this session.')}
+      </div>
+    </div>
+  </div>`;
+  audit('view','check');
+  const input=$('#cnInput');input.focus();
+  $('#cnValidate').onclick=()=>doValidate(input.value);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')doValidate(input.value)});
+  $all('a.sample').forEach(a=>a.onclick=e=>{e.preventDefault();input.value=a.textContent;doValidate(a.textContent)});
+  $('#ownerLookup').onclick=()=>doOwnerLookup($('#ownerInput').value);
+  $('#checkShortcutHelp').onclick=()=>showShortcuts();
+}
+function doValidate(raw){
+  const r=B.validateContainer(raw);
+  const box=$('#cnResult');
+  if(r.valid){
+    box.innerHTML='<div class="alert ok">✓ Valid ISO 6346 — check digit correct ('+r.checkDigit+').</div>';
+  } else {
+    box.innerHTML='<div class="alert bad">✗ Invalid: '+r.errors.join('; ')+'</div>';
+  }
+  renderSpec(r);
+  audit('lookup',(r.normalized||raw)+'|'+(r.valid?'valid':'invalid'));
+}
+function renderSpec(r){
+  const card=$('#specCard');const vgm=$('#vgmCard');
+  if(!r||!r.valid){card.innerHTML='<div class="alert warn">Fix the container number before lookup.</div>';vgm.style.display='none';return}
+  const id=r.normalized;
+  let spec=B.CONTAINERS[id];let sourceLabel='BIC BoxTech';let quality='ok';let age='fresh';let isManual=false;
+  if(!spec){
+    const m=B.state.manual[id];
+    if(m){spec=m;sourceLabel='Manual (unverified)';quality='partial';age='user-entered';isManual=true}
+    else { spec=null }
+  } else { age=daysAgo(spec.fetchedAt) }
+  if(!spec){
+    card.innerHTML = `<div class="alert warn">${t('c.notFoundMsg')}</div>
+    <details><summary class="btn sm" style="cursor:pointer;margin-top:8px">${t('c.manualEntry')} (unverified)</summary>
+    <div style="margin-top:10px">
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div><label>${t('c.sizeType')}</label><input id="mST" class="mono" placeholder="42G1" /></div>
+        <div><label>${t('c.tareWeight')} (kg)</label><input id="mTare" type="number" placeholder="3700" /></div>
+        <div><label>${t('c.maxGross')} (kg)</label><input id="mMG" type="number" placeholder="30480" /></div>
+        <div><label>${t('c.maxPayload')} (kg)</label><input id="mMP" type="number" placeholder="26780" /></div>
+      </div>
+      <button class="btn primary sm" id="saveManual" style="margin-top:8px">Save unverified record</button>
+    </div></details>`;
+    vgm.style.display='none';
+    $('#saveManual').onclick=()=>{
+      const rec={sizeType:$('#mST').value,tare:+$('#mTare').value,maxGross:+$('#mMG').value,maxPayload:+$('#mMP').value,maxStacking:null,manufacturer:null,csc:null,special:null,source:'Manual',fetchedAt:new Date().toISOString().slice(0,10),quality:'partial'};
+      B.state.manual[id]=rec;save('manual',B.state.manual);toast('Unverified record saved for '+id);doValidate(id);
+    };
+    return;
+  }
+  const owner=B.OWNERS[id.slice(0,4)];
+  const stDesc=B.SIZE_TYPES[spec.sizeType]||'Unknown code';
+  card.innerHTML = `
+    <div class="spread"><h3>${id}</h3>${qualityBadge(quality)}</div>
+    <div class="tag-row">${provBadge(sourceLabel,quality,age)}${isManual?'<span class="badge warn">Unverified</span>':''}${spec.csc&&spec.csc.approved?'<span class="badge ok">CSC current</span>':'<span class="badge warn">CSC issue</span>'}</div>
+    <hr>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      ${kv(t('c.owner'),owner?owner.name:'—','BIC Codes')}
+      ${kv(t('c.sizeType'),spec.sizeType+' <span class="muted small">('+esc(stDesc)+')</span>','BIC BoxTech')}
+      ${kv(t('c.tareWeight'),fmt(spec.tare,'kg'),sourceLabel)}
+      ${kv(t('c.maxGross'),fmt(spec.maxGross,'kg'),sourceLabel)}
+      ${kv(t('c.maxPayload'),fmt(spec.maxPayload,'kg'),sourceLabel)}
+      ${kv(t('c.maxStacking'),spec.maxStacking?fmt(spec.maxStacking,'kg'):'—',sourceLabel)}
+      ${kv(t('c.manufacturer'),spec.manufacturer||'—',sourceLabel)}
+      ${kv(t('c.csc'),spec.csc?('Next: '+spec.csc.nextInspection):'—',sourceLabel)}
+    </div>
+    ${spec.special?('<hr><div class="card-2"><div class="tiny muted" style="margin-bottom:4px">Special equipment</div><div class="mono small">'+esc(JSON.stringify(spec.special))+'</div></div>'):''}
+    ${quality==='stale'?'<div class="alert warn" style="margin-top:10px">Data is stale (last fetched '+spec.fetchedAt+'). Click refresh to re-fetch within provider limits.</div>':''}
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" id="refreshSpec">↻ Refresh (counts against BIC budget)</button>
+      <button class="btn sm" id="saveShipment">+ Save to shipment</button>
+    </div>`;
+  $('#refreshSpec').onclick=()=>{spec.fetchedAt=new Date().toISOString().slice(0,10);spec.quality='ok';B.CONTAINERS[id]=spec;toast('Re-fetched (mock). Data age reset.');renderSpec(r)};
+  $('#saveShipment').onclick=()=>openSaveShipment(id,spec);
+  // VGM
+  vgm.style.display='';
+  vgm.innerHTML = `
+    <h3>${t('c.vgm')}</h3>
+    <p class="muted small">Method 2: VGM = tare + cargo + packing + dunnage. Enter the cargo weight to compute.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div><label>Tare (auto)</label><input value="${spec.tare} kg" disabled /></div>
+      <div><label>${t('c.cargoWeight')} (kg) <span class="req">*</span></label><input id="vgmCargo" type="number" placeholder="25000" /></div>
+      <div><label>${t('c.computedVgm')}</label><input id="vgmOut" disabled /></div>
+    </div>
+    <div id="vgmWarn" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary sm" id="vgmCalc">Compute</button>
+      <button class="btn sm" id="vgmSheet">📄 ${t('c.declarationSheet')}</button>
+    </div>`;
+  $('#vgmCalc').onclick=()=>{
+    const cargo=+$('#vgmCargo').value||0;const vgm=spec.tare+cargo;
+    $('#vgmOut').value=vgm+' kg';
+    const w=[];if(vgm>spec.maxGross)w.push('VGM ('+vgm+') exceeds max gross mass ('+spec.maxGross+').');if(cargo>spec.maxPayload)w.push('Cargo ('+cargo+') exceeds max payload ('+spec.maxPayload+').');
+    $('#vgmWarn').innerHTML=w.length?'<div class="alert bad">'+w.join(' ')+'</div>':'<div class="alert ok">Within limits.</div>';
+    state._lastVgm={id,tare:spec.tare,cargo,vgm,maxGross:spec.maxGross,maxPayload:spec.maxPayload,within:w.length===0,source:sourceLabel};
+  };
+  $('#vgmSheet').onclick=()=>{
+    if(!state._lastVgm||state._lastVgm.id!==id){$('#vgmCalc').click()}
+    openVgmSheet(state._lastVgm,spec,owner);
+  };
+}
+function kv(k,v,src){return '<div><div class="tiny muted" style="margin-bottom:2px">'+k+'</div><div class="mono"><b>'+v+'</b></div>'+(src?'<span class="prov ok">'+esc(src)+'</span>':'')+'</div>'}
+function doOwnerLookup(code){
+  const c=String(code||'').toUpperCase().trim();
+  const o=B.OWNERS[c];
+  $('#ownerResult').innerHTML = o?('<div class="card-2"><div class="mono"><b>'+o.name+'</b></div><div class="tiny muted">'+o.city+', '+o.country+' · '+esc(o.contact)+'</div><span class="prov ok">BIC Codes</span></div>'):'<div class="alert warn">Owner code not in sample set. (BIC Codes API in production.)</div>';
+  audit('lookup',c+'|owner');
+}
+function openSaveShipment(id,spec){
+  openDrawer(`
+    <h3>Save to shipment</h3>
+    <label>Booking / reference</label><input id="ssBook" placeholder="BK-2026-001" />
+    <label>Customer</label><input id="ssCust" placeholder="Acme Forwarding" />
+    <label>Vessel (optional)</label><input id="ssVessel" placeholder="MSC Isabella" />
+    <label>Port (UN/LOCODE)</label><input id="ssPort" class="mono" placeholder="DEHAM" />
+    <label>Notes</label><textarea id="ssNotes" rows="2"></textarea>
+    <button class="btn primary" id="ssSave" style="margin-top:8px">Save shipment</button>
+  `);
+  $('#ssSave').onclick=()=>{
+    const bk=$('#ssBook').value||'BK-'+Date.now().toString(36);
+    let s=B.state.shipments.find(x=>x.booking===bk);
+    if(!s){s={id:'sh-'+Date.now().toString(36),booking:bk,customer:$('#ssCust').value,vessel:$('#ssVessel').value,port:$('#ssPort').value.toUpperCase(),notes:$('#ssNotes').value,containers:[],created:new Date().toISOString()};B.state.shipments.unshift(s)}
+    else s.notes=(s.notes?s.notes+'\n':'')+$('#ssNotes').value;
+    s.containers.push({id,weight:spec.tare,sizeType:spec.sizeType,added:new Date().toISOString()});
+    save('shipments',B.state.shipments);
+    audit('shipment.save',bk+'|'+id);
+    toast('Saved to shipment '+bk);
+    closeDrawer();
+  };
+}
+function openVgmSheet(v,spec,owner){
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>VGM Support Sheet — ${v.id}</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:32px;font-size:13px}
+  h1{font-size:18px}table{border-collapse:collapse;width:100%;margin:12px 0}td,th{border:1px solid #ccc;padding:7px 9px;text-align:left;font-size:12px}th{background:#f3f4f6}
+  .warn{background:#fef3c7;border-left:4px solid #d97706;padding:10px;margin:12px 0}
+  .foot{margin-top:24px;color:#666;font-size:11px;border-top:1px solid #ccc;padding-top:10px}
+  .stamp{display:inline-block;border:2px dashed #999;padding:4px 12px;color:#999;font-weight:bold;transform:rotate(-4deg);margin:8px 0}</style></head><body>
+  <h1>VGM Support Sheet (DRAFT — Method 2)</h1>
+  <div class="stamp">DRAFT — NOT CERTIFIED</div>
+  <table>
+  <tr><th>Container number</th><td>${v.id}</td></tr>
+  <tr><th>Owner (BIC Codes)</th><td>${owner?esc(owner.name):'—'}</td></tr>
+  <tr><th>Size / type</th><td>${spec.sizeType}</td></tr>
+  <tr><th>Tare weight</th><td>${v.tare} kg <span style="color:#666">(source: ${esc(v.source)})</span></td></tr>
+  <tr><th>Cargo + packing + dunnage</th><td>${v.cargo} kg <span style="color:#666">(user-entered)</span></td></tr>
+  <tr><th><b>Verified Gross Mass (Method 2)</b></th><td><b>${v.vgm} kg</b></td></tr>
+  <tr><th>Max gross mass</th><td>${v.maxGross} kg</td></tr>
+  <tr><th>Max payload</th><td>${v.maxPayload} kg</td></tr>
+  <tr><th>Compliance check</th><td>${v.within?'Within limits':'⚠ EXCEEDS LIMIT'}</td></tr>
+  <tr><th>Generated</th><td>${new Date().toISOString()}</td></tr>
+  </table>
+  <div class="warn"><b>Legal disclaimer.</b> BoxLens assists with data and calculations only. This sheet is a <b>draft support document, not a certified VGM</b>. It does not replace the shipper's legal responsibility under SOLAS regulation VI/2. Tare weight shown is from third-party data (${esc(v.source)}) and may be stale or partial; the shipper must verify. Never present estimates or missing data as official facts.</div>
+  <div class="foot">BoxLens · Data sources: BIC BoxTech, BIC Codes · Generated ${new Date().toISOString()} · Provisional, subject to provider terms.</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script>
+  </body></html>`);
+  w.document.close();
+  audit('report.vgm',v.id);
+}
+
+/* ================= FACILITIES ================= */
+function renderFacilities(app){
+  app.innerHTML = `
+  ${pageHead('Facilities','Terminal &amp; depot directory · code translator · geofence map · nearest drop-off')}
+  <div class="tabs" id="facTabs">
+    <button data-tab="dir" class="active">Directory</button>
+    <button data-tab="trans">Code translator</button>
+    <button data-tab="map">Map &amp; geofences</button>
+    <button data-tab="near">Nearest drop-off</button>
+  </div>
+  <div id="facBody"></div>`;
+  audit('view','facilities');
+  let tab='dir';
+  function show(){renderFacTab(tab)}
+  $all('#facTabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;$all('#facTabs button').forEach(x=>x.classList.toggle('active',x===b));show()});
+  show();
+}
+function renderFacTab(tab){
+  const body=$('#facBody');
+  if(tab==='dir'){
+    body.innerHTML=`<div class="card"><div class="row"><input id="facSearch" placeholder="Search name, code, country, port (UN/LOCODE)…" /><select id="facType"><option value="">All types</option><option value="terminal">Terminal</option><option value="depot">Depot</option></select></div></div>
+    <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Country</th><th>Owner/Operator</th><th>GPS</th><th></th></tr></thead><tbody id="facRows"></tbody></table></div>`;
+    const draw=()=>{const q=$('#facSearch').value.toLowerCase();const ty=$('#facType').value;
+      const rows=B.FACILITIES.filter(f=>(!ty||f.type===ty)&&(!q||(f.name+' '+f.code+' '+f.country+' '+(f.locode||'')).toLowerCase().includes(q)));
+      $('#facRows').innerHTML=rows.length?rows.map(f=>'<tr><td class="mono"><b>'+f.code+'</b></td><td>'+esc(f.name)+'</td><td><span class="badge '+(f.type==='terminal'?'info':'neutral')+'">'+f.type+'</span></td><td>'+f.country+'</td><td>'+esc(f.owner||'—')+'</td><td class="tiny muted">'+(f.lat?f.lat.toFixed(3)+', '+f.lng.toFixed(3):'—')+'</td><td><a href="#/facilities" class="btn sm" data-code="'+f.code+'">Map</a></td></tr>').join(''):'<tr><td colspan="7" class="muted center">No facilities</td></tr>';
+      $all('#facRows [data-code]').forEach(a=>a.onclick=e=>{e.preventDefault();showOnMap(a.dataset.code)});
+    };
+    $('#facSearch').oninput=draw;$('#facType').onchange=draw;draw();
+  } else if(tab==='trans'){
+    body.innerHTML=`<div class="card"><label>Paste EDI text or a list of facility codes (comma, space or newline separated)</label>
+    <textarea id="transInput" rows="4" placeholder="NLRTM, DEHAM&#10;AEJEA SGSIN">NLRTM&#10;DEHAM&#10;AEJEA&#10;SGSIN&#10;CNSHA</textarea>
+    <div class="row" style="margin-top:8px"><button class="btn primary sm" id="transRun">Translate</button><button class="btn sm" id="transCsv">Download CSV</button></div>
+    <div id="transOut" style="margin-top:12px"></div></div>`;
+    const run=()=>{const txt=$('#transInput').value;const codes=txt.split(/[\s,;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
+      const out=codes.map(c=>{const f=B.FACILITIES.find(x=>x.code===c);return{code:c,found:!!f,name:f?f.name:'—',country:f?f.country:'—',lat:f?f.lat:null,lng:f?f.lng:null}});
+      B.state._lastTrans=out;
+      $('#transOut').innerHTML='<div class="table-wrap"><table><thead><tr><th>Code</th><th>Name</th><th>Country</th><th>GPS</th></tr></thead><tbody>'+out.map(o=>'<tr><td class="mono">'+o.code+'</td><td>'+(o.found?esc(o.name):'<span class="badge bad">Not found</span>')+'</td><td>'+o.country+'</td><td class="tiny">'+(o.lat?o.lat.toFixed(3)+', '+o.lng.toFixed(3):'—')+'</td></tr>').join('')+'</tbody></table></div>';
+      audit('translate',codes.length+' codes');
+    };
+    $('#transRun').onclick=run;$('#transCsv').onclick=()=>{if(!B.state._lastTrans)return;download('boxlens_facility_codes.csv',csvBuild([['Code','Name','Country','Lat','Lng']].concat(B.state._lastTrans.map(o=>[o.code,o.name,o.country,o.lat,o.lng]))),'text/csv')};run();
+  } else if(tab==='map'){
+    body.innerHTML=`<div class="card"><div id="map"></div><div id="mapInfo" class="tiny muted" style="margin-top:8px">Click a marker for facility details. Geofence shown for Hamburg.</div></div>`;
+    setTimeout(initMap,50);
+  } else if(tab==='near'){
+    body.innerHTML=`<div class="card"><label>Your location (lat,lng) or pick a port</label>
+    <div class="row"><input id="nearLL" class="mono" placeholder="53.55,9.94" /><select id="nearPort">${B.FACILITIES.filter(f=>f.type==='terminal').map(f=>'<option value="'+f.lat+','+f.lng+'">'+esc(f.name)+'</option>').join('')}</select></div>
+    <div class="row" style="margin-top:8px"><label class="checkbox-row"><input type="checkbox" id="nearDepot" /> depots only</label><button class="btn primary sm" id="nearRun">Find nearest</button></div>
+    <div id="nearOut" style="margin-top:12px"></div></div>`;
+    $('#nearPort').onchange=()=>$('#nearLL').value=$('#nearPort').value;
+    $('#nearRun').onclick=()=>{
+      const ll=$('#nearLL').value.split(',').map(Number);if(ll.length<2||ll.some(isNaN))return toast('Enter lat,lng');
+      const depot=$('#nearDepot').checked;
+      const ranked=B.FACILITIES.filter(f=>f.lat&&(!depot||f.type==='depot')).map(f=>({f,d:haversine(ll[0],ll[1],f.lat,f.lng)})).sort((a,b)=>a.d-b.d).slice(0,5);
+      $('#nearOut').innerHTML='<div class="table-wrap"><table><thead><tr><th>Distance</th><th>Code</th><th>Name</th><th>Type</th><th>Address</th></tr></thead><tbody>'+ranked.map(r=>'<tr><td><b>'+fmt(r.d,'km')+'</b></td><td class="mono">'+r.f.code+'</td><td>'+esc(r.f.name)+'</td><td>'+r.f.type+'</td><td class="tiny">'+esc(r.f.address||'')+'</td></tr>').join('')+'</tbody></table></div>';
+    };
+  }
+}
+function haversine(la1,lo1,la2,lo2){const R=6371;const dLat=(la2-la1)*Math.PI/180;const dLon=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))}
+function showOnMap(code){const f=B.FACILITIES.find(x=>x.code===code);if(!f||!B._map)return;B._map.setView([f.lat,f.lng],11);L.popup().setLatLng([f.lat,f.lng]).setContent('<b>'+f.code+'</b><br>'+esc(f.name)).openOn(B._map)}
+function initMap(){
+  if(B._map){try{B._map.remove()}catch(e){}}
+  const map=L.map('map').setView([35,5],2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
+  B._map=map;
+  B.FACILITIES.forEach(f=>{
+    if(!f.lat)return;
+    const m=L.circleMarker([f.lat,f.lng],{radius:7,color:f.type==='terminal'?'#0f766e':'#d97706',fillColor:f.type==='terminal'?'#0f766e':'#d97706',fillOpacity:.7,weight:1}).addTo(map);
+    m.bindPopup('<b class="mono">'+f.code+'</b><br>'+esc(f.name)+'<br><span class="tiny">'+f.type+' · '+f.country+'</span><br><span class="tiny">'+esc(f.address||'')+'</span>');
+  });
+  // geofence for Hamburg
+  const hh=B.FACILITIES.find(f=>f.code==='DEHAM');
+  if(hh&&hh.geofence){L.polygon(hh.geofence[0],{color:'#dc2626',weight:2,dashArray:'5 5',fillOpacity:.05}).addTo(map).bindPopup('Geofence: Port of Hamburg (sample)')}
+}
+
+/* ================= COMPLIANCE ================= */
+function renderCompliance(app){
+  app.innerHTML=`
+  ${pageHead('Compliance','Bulk booking validation · rule engine · data-gap &amp; coverage reports')}
+  <div class="tabs" id="cmpTabs">
+    <button data-tab="bulk" class="active">Bulk check</button>
+    <button data-tab="rules">Rule library</button>
+    <button data-tab="gap">Data-gap report</button>
+    <button data-tab="coverage">Owner coverage</button>
+  </div>
+  <div id="cmpBody"></div>`;
+  audit('view','compliance');
+  let tab='bulk';
+  $all('#cmpTabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;$all('#cmpTabs button').forEach(x=>x.classList.toggle('active',x===b));renderCmpTab(tab)});
+  renderCmpTab('bulk');
+}
+function renderCmpTab(tab){
+  const body=$('#cmpBody');
+  if(tab==='bulk'){
+    body.innerHTML=`<div class="card">
+      <label>Upload CSV or paste rows — columns: <span class="mono">container,cargo_weight,vessel,port,size_type?</span></label>
+      <textarea id="bulkInput" rows="6">container,cargo_weight,vessel,port,size_type
+CSQU3054383,26000,MSC Isabella,DEHAM,42G1
+TCNU4852000,30000,Maersk Edmonton,NLRTM,45R1
+CMAU3456787,31000,CMA CGM Marco Polo,AEJEA,42G1
+HLCU7654320,30500,Hapag-Lloyd Berlin,USLAX,42G1
+XXXX1234567,28000,Ever Given,SGSIN,42G1
+ZZZU9999999,26000,ONE Innovation,CNSHA,22G1</textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary sm" id="bulkRun">▶ ${t('c.run')}</button>
+        <button class="btn sm" id="bulkSample">Load 5000 sample rows</button>
+        <span class="grow"></span>
+        <button class="btn sm" id="bulkExport">Download results CSV</button>
+      </div>
+      <div id="bulkProgress" style="margin-top:10px"></div>
+    </div>
+    <div id="bulkSummary" style="margin-top:12px"></div>
+    <div id="bulkResults" style="margin-top:12px"></div>`;
+    $('#bulkRun').onclick=()=>runBulk($('#bulkInput').value);
+    $('#bulkSample').onclick=()=>{const rows=[['container','cargo_weight','vessel','port','size_type']];const ids=Object.keys(B.CONTAINERS);for(let i=0;i<5000;i++){const id=ids[i%ids.length];rows.push([id,(20000+Math.floor(Math.random()*12000)),'Vessel-'+(i%8),'DEHAM','42G1'])}$('#bulkInput').value=csvBuild(rows);toast('Loaded 5000 sample rows')};
+    $('#bulkExport').onclick=()=>{if(!B.state._lastBulk)return;const r=B.state._lastBulk;download('boxlens_compliance.csv',csvBuild([['container','cargo_weight','result','reasons']].concat(r.rows.map(x=>[x.id,x.weight,x.result,x.reasons.join('; ')]))),'text/csv')};
+    // auto-run initial
+    runBulk($('#bulkInput').value);
+  } else if(tab==='rules'){
+    body.innerHTML=`<div class="card"><p class="muted small">Rules are <b>data, not code</b>, and versioned per tenant. Toggle to enable/disable. Severity drives the result colour.</p>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Rule</th><th>Severity</th><th>Description</th><th>Enabled</th></tr></thead><tbody>${B.RULES.map(r=>'<tr><td class="mono">'+r.id+'</td><td>'+esc(r.name)+'</td><td><span class="badge '+sevClass(r.severity)+'">'+r.severity+'</span></td><td class="small">'+esc(r.desc)+'</td><td><label class="checkbox-row"><input type="checkbox" data-rule="'+r.id+'" checked /></label></td></tr>').join('')}</tbody></table></div>
+    <div class="alert info" style="margin-top:12px">Versioned: rule-set <code>v1.4.0</code> · last published 2026-11-15 · audited changes only.</div></div>`;
+  } else if(tab==='gap'){
+    const gap=computeDataGap();
+    body.innerHTML=`<div class="card"><h3>Data-gap report</h3><p class="muted small">Containers with no or partial data, grouped by owner and country.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+      <div class="card-2"><div class="tiny muted">By owner</div>${gap.byOwner.map(o=>'<div class="stat-line"><span>'+o.name+'</span><span class="v">'+o.count+'</span></div>').join('')}</div>
+      <div class="card-2"><div class="tiny muted">By country</div>${gap.byCountry.map(c=>'<div class="stat-line"><span>'+c.name+'</span><span class="v">'+c.count+'</span></div>').join('')}</div>
+    </div>
+    <div class="row"><button class="btn sm" id="gapExport">Export follow-up list (CSV)</button></div>
+    <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Container</th><th>Owner</th><th>Country</th><th>Status</th></tr></thead><tbody>${gap.rows.map(r=>'<tr><td class="mono">'+r.id+'</td><td>'+esc(r.owner)+'</td><td>'+r.country+'</td><td><span class="badge '+sevClass(r.sev)+'">'+r.status+'</span></td></tr>').join('')}</tbody></table></div></div>`;
+    $('#gapExport').onclick=()=>download('boxlens_datagap.csv',csvBuild([['container','owner','country','status']].concat(gap.rows.map(r=>[r.id,r.owner,r.country,r.status]))),'text/csv');
+  } else if(tab==='coverage'){
+    const cov=computeCoverage();
+    body.innerHTML=`<div class="card"><h3>Owner coverage score</h3><p class="muted small">Share of looked-up containers found, per owner, over time.</p>
+    <div id="covChart" class="chart"></div>
+    <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Owner</th><th>Lookups</th><th>Found</th><th>Coverage</th></tr></thead><tbody>${cov.rows.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+r.lookups+'</td><td>'+r.found+'</td><td><div class="progress" style="width:120px;display:inline-block;vertical-align:middle"><i style="width:'+r.pct+'%;background:'+(r.pct>70?'var(--ok)':r.pct>40?'var(--warn)':'var(--bad)')+'"></i></div> '+r.pct+'%</td></tr>').join('')}</tbody></table></div></div>`;
+    setTimeout(()=>chartInit('covChart',{title:{text:'Coverage trend by owner'},legend:{top:0},grid:{left:50,right:20,top:40,bottom:30},tooltip:{trigger:'axis'},xAxis:{type:'category',data:['W1','W2','W3','W4','W5','W6']},yAxis:{type:'value',max:100,axisLabel:{formatter:'{value}%'}},series:cov.owners.slice(0,5).map((o,i)=>({name:o,type:'line',smooth:true,data:cov.trend[i]}))}),50);
+  }
+}
+function sevClass(s){return s==='fail'?'bad':s==='warn'?'warn':s==='nodata'?'neutral':'ok'}
+function runBulk(text){
+  const rows=csvParse(text);if(rows.length<2)return;
+  const header=rows[0].map(h=>h.toLowerCase());
+  const idx={container:header.indexOf('container'),cargo:header.indexOf('cargo_weight')>-1?header.indexOf('cargo_weight'):header.indexOf('weight'),vessel:header.indexOf('vessel'),port:header.indexOf('port'),st:header.indexOf('size_type')>-1?header.indexOf('size_type'):header.indexOf('sizetype')};
+  const data=rows.slice(1).filter(r=>r.length>=2);
+  const prog=$('#bulkProgress');const sumEl=$('#bulkSummary');
+  let i=0;const total=data.length;const results=[];
+  function step(){
+    const batch=Math.min(60,total-i);
+    for(let k=0;k<batch&&i<total;k++,i++){
+      const r=data[i];const id=(r[idx.container]||'').toUpperCase().trim();const weight=+(r[idx.cargo]||0);
+      results.push(evaluateRow(id,weight,r[idx.vessel],r[idx.port],r[idx.st]));
+    }
+    if(prog)prog.innerHTML='<div class="stat-line"><span>Processing…</span><span class="v">'+i+' / '+total+'</span></div><div class="progress"><i style="width:'+Math.round(100*i/total)+'%"></i></div>';
+    if(i<total){requestAnimationFrame(step)}else{finishBulk(results)}
+  }
+  step();
+}
+function evaluateRow(id,weight,vessel,port,st){
+  const v=B.validateContainer(id);const reasons=[];let result='pass';
+  if(!v.valid){result='fail';reasons.push('Invalid check digit');}
+  const spec=B.CONTAINERS[id]||B.state.manual[id];
+  if(!spec){if(result==='pass')result='nodata';reasons.push('No technical record');}
+  else{
+    if(weight+spec.tare>spec.maxGross){result='fail';reasons.push('VGM > max gross ('+spec.maxGross+')')}
+    else if(weight>spec.maxPayload){result='fail';reasons.push('Cargo > max payload ('+spec.maxPayload+')')}
+    if(st&&spec.sizeType&&st.toUpperCase()!==spec.sizeType){if(result==='pass')result='warn';reasons.push('Size/type mismatch ('+spec.sizeType+')')}
+    if(spec.csc&&!spec.csc.approved){if(result==='pass'||result==='warn')result='warn';reasons.push('CSC not approved')}
+    if(spec.quality==='stale'){if(result==='pass')result='warn';reasons.push('Stale data')}
+  }
+  return{id,vessel,port,weight,spec,result,reasons};
+}
+function finishBulk(results){
+  B.state._lastBulk={rows:results};
+  const c={pass:0,warn:0,fail:0,nodata:0};
+  results.forEach(r=>c[r.result]++);
+  const total=results.length;
+  $('#bulkProgress').innerHTML='';
+  $('#bulkSummary').innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${statTile(total,'Rows processed')}${statTile(fmt(c.pass),'Pass','var(--ok)')}${statTile(fmt(c.warn),'Warning','var(--warn)')}${statTile(fmt(c.fail),'Fail','var(--bad)')}${statTile(fmt(c.nodata),'No data','var(--muted)')}</div>`;
+  $('#bulkResults').innerHTML=`<div class="card"><h3>${t('c.results')} <span class="tiny muted">(${total})</span></h3>
+  <div class="table-wrap"><table><thead><tr><th>Container</th><th>Cargo</th><th>Vessel</th><th>Port</th><th>${t('c.result')}</th><th>${t('c.reason')}</th></tr></thead><tbody>${results.slice(0,200).map(r=>'<tr><td class="mono">'+r.id+'</td><td>'+fmt(r.weight,'kg')+'</td><td>'+esc(r.vessel||'—')+'</td><td>'+esc(r.port||'—')+'</td><td><span class="badge '+sevClass(r.result)+'">'+r.result+'</span></td><td class="small">'+r.reasons.map(esc).join('; ')+'</td></tr>').join('')}</tbody></table></div>
+  ${total>200?'<div class="tiny muted center" style="margin-top:8px">Showing first 200 of '+total+' — download CSV for all.</div>':''}</div>`;
+  audit('compliance.bulk',total+' rows');
+}
+function computeDataGap(){
+  const rows=[];
+  // include some no-data examples
+  const extra=['ZZZU9999999','WWWU1111111','ABCU2222222'];
+  extra.forEach(id=>{const v=B.validateContainer(id);const owner=id.slice(0,4);rows.push({id,owner:owner,country:'—',sev:'nodata',status:'No data'})});
+  Object.keys(B.CONTAINERS).forEach(id=>{const s=B.CONTAINERS[id];if(s.quality!=='ok')rows.push({id,owner:B.OWNERS[id.slice(0,4)]?B.OWNERS[id.slice(0,4)].name:id.slice(0,4),country:B.OWNERS[id.slice(0,4)]?B.OWNERS[id.slice(0,4)].country:'—',sev:s.quality==='stale'?'warn':'nodata',status:s.quality==='stale'?'Stale':'Partial'})});
+  const byOwner={},byCountry={};
+  rows.forEach(r=>{byOwner[r.owner]=(byOwner[r.owner]||0)+1;byCountry[r.country]=(byCountry[r.country]||0)+1});
+  return{rows,byOwner:Object.entries(byOwner).map(([n,c])=>({name:n,count:c})).sort((a,b)=>b.count-a.count),byCountry:Object.entries(byCountry).map(([n,c])=>({name:n,count:c}))};
+}
+function computeCoverage(){
+  const owners=Object.keys(B.OWNERS);
+  const rows=owners.map(o=>{const lookups=Math.floor(40+Math.random()*200);const found=Math.floor(lookups*(0.5+Math.random()*0.5));return{name:B.OWNERS[o].name,lookups,found,pct:Math.round(100*found/lookups)}});
+  const trend=rows.slice(0,5).map(()=>[60,65,68,72,75,78].map(x=>x+Math.floor(Math.random()*8)));
+  return{rows,owners:rows.map(r=>r.name),trend};
+}
+
+/* ================= WORKFLOW ================= */
+function renderWorkflow(app){
+  app.innerHTML=`
+  ${pageHead('Workflow','Saved shipments · watchlists · alerts')}
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card"><h3>Shipments <button class="btn sm" id="newShipment" style="float:right">+ New</button></h3><div id="shipList"></div></div>
+    <div class="card"><h3>Watchlists &amp; alerts</h3>
+      <label>Alert rule</label>
+      <select id="alertRule"><option value="eta">Vessel within 24h of port</option><option value="weather">Weather risk above threshold</option><option value="holiday">Public holiday on arrival day</option><option value="datachange">Container data changed</option><option value="missing">Missing data resolved</option></select>
+      <label>Channels</label>
+      <div class="row"><label class="checkbox-row"><input type="checkbox" checked> In-app</label><label class="checkbox-row"><input type="checkbox" checked> Email</label><label class="checkbox-row"><input type="checkbox"> Webhook</label><label class="checkbox-row"><input type="checkbox"> WhatsApp</label></div>
+      <button class="btn primary sm" id="addAlert" style="margin-top:8px">Create alert</button>
+      <div id="alertList" style="margin-top:12px"></div>
+    </div>
+  </div>`;
+  audit('view','workflow');
+  drawShipments();drawAlerts();
+  $('#newShipment').onclick=()=>{openDrawer('<h3>New shipment</h3><label>Booking</label><input id="nsBook" placeholder="BK-2026-001" /><label>Customer</label><input id="nsCust" /><label>Vessel</label><input id="nsVessel" placeholder="MSC Isabella" /><label>Port</label><input id="nsPort" class="mono" placeholder="DEHAM" /><button class="btn primary" id="nsSave" style="margin-top:8px">Create</button>');
+    $('#nsSave').onclick=()=>{const bk=$('#nsBook').value||'BK-'+Date.now().toString(36);B.state.shipments.unshift({id:'sh-'+Date.now().toString(36),booking:bk,customer:$('#nsCust').value,vessel:$('#nsVessel').value,port:$('#nsPort').value.toUpperCase(),containers:[],created:new Date().toISOString()});save('shipments',B.state.shipments);toast('Shipment created');closeDrawer();drawShipments()}};
+  $('#addAlert').onclick=()=>{const rule=$('#alertRule').value;B.state.watchlists.unshift({id:'al-'+Date.now().toString(36),rule,created:new Date().toISOString(),triggered:Math.random()>0.5});save('watchlists',B.state.watchlists);audit('alert.create',rule);drawAlerts();toast('Alert created')};
+}
+function drawShipments(){
+  const el=$('#shipList');
+  el.innerHTML=B.state.shipments.length?B.state.shipments.map(s=>'<div class="card-2" style="margin-bottom:8px"><div class="spread"><b class="mono">'+esc(s.booking)+'</b><button class="btn sm bad-del" data-del="'+s.id+'">Delete</button></div><div class="tiny muted">'+esc(s.customer||'')+(s.vessel?' · '+esc(s.vessel):'')+(s.port?' · '+s.port:'')+'</div><div class="tiny">'+s.containers.length+' container(s)</div></div>').join(''):emptyState('📦','No shipments yet. Use Check → Save to shipment, or + New.');
+  $all('[data-del]').forEach(b=>b.onclick=()=>{B.state.shipments=B.state.shipments.filter(x=>x.id!==b.dataset.del);save('shipments',B.state.shipments);drawShipments()});
+}
+function drawAlerts(){
+  const el=$('#alertList');
+  el.innerHTML=B.state.watchlists.length?B.state.watchlists.map(a=>'<div class="card-2" style="margin-bottom:8px"><div class="spread"><span>'+esc(a.rule)+'</span><span class="badge '+(a.triggered?'bad':'neutral')+'">'+(a.triggered?'Triggered':'Armed')+'</span></div><div class="tiny muted">'+daysAgo(a.created.slice(0,10))+' ago</div></div>').join(''):emptyState('🔔','No alerts yet.');
+}
+
+/* ================= DASHBOARDS ================= */
+function renderDashboards(app){
+  app.innerHTML=`
+  ${pageHead('Dashboards','Widget framework · saved per user/tenant · data-freshness on every widget')}
+  <div class="row" style="margin-bottom:12px">
+    <select id="dashSel">
+      <option value="compliance">Shipment compliance</option>
+      <option value="coverage">Data coverage</option>
+      <option value="gate">Gate &amp; yard</option>
+      <option value="map">Facility map</option>
+      <option value="arrivals">Arrivals &amp; congestion</option>
+      <option value="combo">Combination view</option>
+      <option value="exec">Executive summary</option>
+    </select>
+    <span class="grow"></span>
+    <span class="badge ok"><span class="dot" style="background:var(--ok)"></span> Fresh · updated 2m ago</span>
+    <button class="btn sm" id="dashExport">Export PNG</button>
+  </div>
+  <div id="dashBody"></div>`;
+  audit('view','dashboards');
+  $('#dashSel').onchange=()=>renderDash($('#dashSel').value);
+  $('#dashExport').onclick=()=>{const first=Object.values(B.state.charts)[0];if(first){const url=first.getDataURL({type:'png',pixelRatio:2,backgroundColor:'#fff'});const a=el('<a></a>');a.href=url;a.download='boxlens_dashboard.png';document.body.appendChild(a);a.click();a.remove()}else toast('No chart to export')};
+  renderDash('compliance');
+}
+function renderDash(which){
+  const body=$('#dashBody');
+  // dispose previous charts
+  Object.values(B.state.charts).forEach(c=>{try{c.dispose()}catch(e){}});B.state.charts={};
+  if(which==='compliance'){
+    body.innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${statTile('1,284','Containers checked')}${statTile('78%','VGM-ready','var(--ok)')}${statTile('142','Overweight warnings','var(--warn)')}${statTile('38','No-data list','var(--bad)')}</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px"><div class="card"><h3>Result mix</h3><div id="d_mix" class="chart sm"></div></div><div class="card"><h3>Rejection risk by booking</h3><div id="d_risk" class="chart sm"></div></div></div>
+    <div class="card" style="margin-top:12px"><h3>VGM-ready trend</h3><div id="d_trend" class="chart"></div></div>`;
+    setTimeout(()=>{chartInit('d_mix',{tooltip:{trigger:'item'},legend:{bottom:0},series:[{type:'pie',radius:['40%','70%'],data:[{value:980,name:'Pass'},{value:142,name:'Warning'},{value:124,name:'Fail'},{value:38,name:'No data'}]}]});chartInit('d_risk',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:30},xAxis:{type:'category',data:['BK-001','BK-002','BK-003','BK-004','BK-005','BK-006','BK-007']},yAxis:{type:'value',max:100},series:[{type:'bar',data:[12,28,45,18,62,30,8],itemStyle:{color:'#dc2626'}}]});chartInit('d_trend',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:30},xAxis:{type:'category',data:['Mon','Tue','Wed','Thu','Fri','Sat','Sun']},yAxis:{type:'value',max:100,axisLabel:{formatter:'{value}%'}},series:[{type:'line',smooth:true,areaStyle:{},data:[68,71,74,73,78,79,78]}]});},50);
+  } else if(which==='coverage'){
+    body.innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${statTile('86%','Share found','var(--ok)')}${statTile('14','Owners tracked')}${statTile('42','Countries')}</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px"><div class="card"><h3>Coverage by owner</h3><div id="d_own" class="chart"></div></div><div class="card"><h3>Coverage by country (top 10)</h3><div id="d_cou" class="chart"></div></div></div>
+    <div class="card" style="margin-top:12px"><h3>Coverage trend</h3><div id="d_ct" class="chart"></div></div>`;
+    setTimeout(()=>{chartInit('d_own',{tooltip:{trigger:'axis'},grid:{left:80,right:20,top:20,bottom:30},xAxis:{type:'value',max:100},yAxis:{type:'category',data:['MSC','Maersk','CMA CGM','COSCO','ONE','Hapag','Evergreen','OOCL','Yang Ming','HMM']},series:[{type:'bar',data:[92,88,79,84,76,90,71,68,82,64]}]});chartInit('d_cou',{tooltip:{trigger:'item'},series:[{type:'pie',radius:'65%',data:[{value:240,name:'CN'},{value:180,name:'US'},{value:160,name:'DE'},{value:140,name:'NL'},{value:120,name:'SG'},{value:110,name:'AE'},{value:90,name:'KR'},{value:80,name:'JP'},{value:70,name:'IN'},{value:60,name:'GB'}]}]});chartInit('d_ct',{tooltip:{trigger:'axis'},legend:{data:['Found','Missing'],bottom:0},grid:{left:40,right:20,top:20,bottom:40},xAxis:{type:'category',data:['W1','W2','W3','W4','W5','W6','W7','W8']},yAxis:{type:'value'},series:[{name:'Found',type:'line',smooth:true,data:[820,880,910,940,970,1010,1040,1080]},{name:'Missing',type:'line',smooth:true,data:[180,160,140,120,100,90,80,70]}]});},50);
+  } else if(which==='gate'){
+    body.innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${statTile('342','Checks / hour')}${statTile('47','Validation failures','var(--bad)')}${statTile('19','Limits exceeded','var(--warn)')}</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px"><div class="card"><h3>Checks per hour (24h)</h3><div id="d_hour" class="chart sm"></div></div><div class="card"><h3>Top error reasons</h3><div id="d_err" class="chart sm"></div></div></div>
+    <div class="card" style="margin-top:12px"><h3>Validation failures by terminal</h3><div id="d_term" class="chart"></div></div>`;
+    setTimeout(()=>{chartInit('d_hour',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:30},xAxis:{type:'category',data:Array.from({length:24},(_,i)=>i+':00')},yAxis:{type:'value'},series:[{type:'bar',data:[120,90,60,40,30,50,180,320,410,380,360,350,340,330,360,370,390,420,380,300,240,180,140,110]}]});chartInit('d_err',{tooltip:{trigger:'item'},series:[{type:'pie',radius:'65%',data:[{value:18,name:'Invalid check digit'},{value:12,name:'Overweight'},{value:9,name:'Size/type mismatch'},{value:6,name:'CSC expired'},{value:2,name:'Owner mismatch'}]}]});chartInit('d_term',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:40},xAxis:{type:'category',data:['DEHAM','NLRTM','AEJEA','SGSIN','CNSHA','USLAX','USNYC','BEANR']},yAxis:{type:'value'},series:[{name:'Failures',type:'bar',data:[8,12,4,9,15,6,3,7]},{name:'Limits exceeded',type:'bar',data:[3,5,1,4,6,2,1,3]}]});},50);
+  } else if(which==='map'){
+    body.innerHTML=`<div class="card"><h3>Facility map &amp; code lookup history</h3><div id="map" style="height:480px"></div></div>
+    <div class="card" style="margin-top:12px"><h3>Lookups by facility (last 7 days)</h3><div id="d_fac" class="chart"></div></div>`;
+    setTimeout(()=>{initMap();chartInit('d_fac',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:40},xAxis:{type:'category',data:['DEHAM','NLRTM','AEJEA','SGSIN','CNSHA','USLAX','USNYC','BEANR','ESBCN','INMUN']},yAxis:{type:'value'},series:[{type:'bar',data:[420,510,280,470,610,330,210,290,180,150]}]});},50);
+  } else if(which==='arrivals'){
+    body.innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${statTile('5','Approaching')}${statTile('2','At anchor','var(--warn)')}${statTile('2','Alongside','var(--ok)')}${statTile('19','Avg queue','var(--warn)')}</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px"><div class="card"><h3>Vessel states</h3><div id="d_st" class="chart sm"></div></div><div class="card"><h3>Congestion score by port</h3><div id="d_cong" class="chart sm"></div></div></div>
+    <div class="card" style="margin-top:12px"><h3>ETA distribution (next 48h)</h3><div id="d_eta" class="chart"></div></div>`;
+    setTimeout(()=>{chartInit('d_st',{tooltip:{trigger:'item'},series:[{type:'pie',radius:'65%',data:[{value:5,name:'Approaching'},{value:2,name:'Waiting'},{value:2,name:'Alongside'}]}]});chartInit('d_cong',{tooltip:{trigger:'axis'},grid:{left:60,right:20,top:20,bottom:40},xAxis:{type:'category',data:['NLRTM','USNYC','CNSHA','SGSIN','AEJEA','DEHAM','BEANR']},yAxis:{type:'value',max:100},series:[{type:'bar',data:[78,65,52,48,22,18,15],itemStyle:{color:'#d97706'}}]});chartInit('d_eta',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:30},xAxis:{type:'category',data:Array.from({length:16},(_,i)=>'+'+i*3+'h')},yAxis:{type:'value'},series:[{type:'bar',data:[1,2,1,0,2,1,1,0,1,2,1,0,1,1,0,1]}]});},50);
+  } else if(which==='combo'){
+    body.innerHTML=`<div class="card"><h3>Combination view — MSC Isabella → DEHAM</h3><p class="muted small">For one shipment: vessel position &amp; ETA estimate, weather risk, holiday risk, container warnings, in one timeline. <b>Honesty rule:</b> AIS shows vessels, not containers; linkage comes from user-provided booking data.</p>
+    <div id="d_combo" class="chart lg"></div></div>
+    <div class="card" style="margin-top:12px"><h3>Linked containers</h3>
+    <div class="table-wrap"><table><thead><tr><th>Container</th><th>VGM</th><th>Max gross</th><th>Status</th></tr></thead><tbody>
+    <tr><td class="mono">CSQU3054383</td><td>29,700 kg</td><td>30,480 kg</td><td><span class="badge ok">OK</span></td></tr>
+    <tr><td class="mono">MSKU1234565</td><td>30,200 kg</td><td>30,480 kg</td><td><span class="badge warn">Near limit</span></td></tr>
+    <tr><td class="mono">CMAU3456787</td><td>31,000 kg</td><td>34,800 kg</td><td><span class="badge warn">Stale data</span></td></tr>
+    </tbody></table></div></div>`;
+    setTimeout(()=>{chartInit('d_combo',{tooltip:{trigger:'axis'},legend:{data:['Vessel distance (km)','Weather risk','Container warnings'],bottom:0},grid:{left:50,right:50,top:30,bottom:50},xAxis:{type:'category',data:['-24h','-18h','-12h','-6h','now','+6h','+12h','+18h','+24h','ETA']},yAxis:[{type:'value',name:'km'},{type:'value',name:'risk',max:100}],series:[{name:'Vessel distance (km)',type:'line',smooth:true,data:[420,360,300,240,180,120,80,40,15,0]},{name:'Weather risk',type:'line',yAxisIndex:1,smooth:true,data:[20,22,25,30,35,40,38,30,25,20]},{name:'Container warnings',type:'bar',data:[0,0,1,1,2,2,1,1,0,0]}]});},50);
+  } else if(which==='exec'){
+    body.innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${statTile('1,284','Weekly volume')}${statTile('347','Issues avoided','var(--ok)')}${statTile('62h','Time saved')}${statTile('4','Teams active')}</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px"><div class="card"><h3>Usage by team</h3><div id="d_team" class="chart sm"></div></div><div class="card"><h3>Issues avoided (8 weeks)</h3><div id="d_avoid" class="chart sm"></div></div></div>
+    <div class="card" style="margin-top:12px"><h3>Time saved (hours/week)</h3><div id="d_time" class="chart"></div></div>`;
+    setTimeout(()=>{chartInit('d_team',{tooltip:{trigger:'item'},series:[{type:'pie',radius:'65%',data:[{value:480,name:'Forwarding'},{value:320,name:'Ocean'},{value:240,name:'Depot'},{value:160,name:'Compliance'},{value:84,name:'Sales'}]}]});chartInit('d_avoid',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:30},xAxis:{type:'category',data:['W1','W2','W3','W4','W5','W6','W7','W8']},yAxis:{type:'value'},series:[{type:'bar',data:[210,240,265,290,310,330,340,347]}]});chartInit('d_time',{tooltip:{trigger:'axis'},grid:{left:40,right:20,top:20,bottom:30},xAxis:{type:'category',data:['W1','W2','W3','W4','W5','W6','W7','W8']},yAxis:{type:'value'},series:[{type:'line',smooth:true,areaStyle:{},data:[38,42,46,50,54,56,60,62]}]});},50);
+  }
+}
+
+/* ================= ARRIVALS ================= */
+function renderArrivals(app){
+  app.innerHTML=`
+  ${pageHead('Arrivals','Vessel approach · anchorage · alongside · congestion · weather · holidays')}
+  <div class="alert legal">Honesty rule: AIS shows vessels, not containers. Container-to-vessel linkage comes from user-provided booking data. ETAs are estimates with method and age.</div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+    <div class="card"><div id="map" style="height:300px"></div></div>
+    <div class="card"><h3>Port snapshot</h3>
+      <select id="arrPort">${B.FACILITIES.filter(f=>f.type==='terminal').map(f=>'<option value="'+f.code+'">'+esc(f.name)+'</option>').join('')}</select>
+      <div id="arrInfo" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>Vessels</h3>
+    <div class="table-wrap"><table><thead><tr><th>Vessel</th><th>IMO</th><th>Operator</th><th>Port</th><th>State</th><th>Speed</th><th>ETA (est.)</th><th>Queue</th><th>Data age</th></tr></thead><tbody>${B.VESSELS.map(v=>'<tr><td><b>'+esc(v.name)+'</b></td><td class="mono">'+v.imo+'</td><td>'+v.operator+'</td><td>'+v.port+'</td><td><span class="badge '+vesselClass(v.status)+'">'+v.status+'</span></td><td>'+v.speed+' kn</td><td class="mono small">'+esc(v.eta.replace('T',' ').slice(0,16))+'</td><td>'+v.queue+'</td><td><span class="prov '+(v.ageMin<5?'ok':'warn')+'">aisstream.io · '+v.ageMin+'m</span></td></tr>').join('')}</tbody></table></div>
+  </div>`;
+  audit('view','arrivals');
+  setTimeout(initMap,50);
+  const updatePort=()=>{const code=$('#arrPort').value;const v=B.VESSELS.filter(x=>x.port===code);const w=B.WEATHER[code];const h=B.HOLIDAYS.filter(x=>x.country===B.FACILITIES.find(f=>f.code===code).country);
+    const queue=v.reduce((a,x)=>a+x.queue,0);const cong=Math.min(100,queue*8+v.filter(x=>x.status==='waiting').length*15);
+    $('#arrInfo').innerHTML=`<div class="grid" style="grid-template-columns:1fr 1fr">${statTile(v.length,'Vessels')}${statTile(queue,'Queue length','var(--warn)')}${statTile(cong,'Congestion score','var('+(cong>50?'--bad':'--warn')+')')}</div>
+    <hr><div class="tiny muted">Weather (Open-Meteo Marine)</div>${w?('<div class="card-2"><div class="stat-line"><span>Wave height</span><span class="v">'+w.wave+' m</span></div><div class="stat-line"><span>Wind</span><span class="v">'+w.wind+' kn (gust '+w.gust+')</span></div><div class="stat-line"><span>Visibility</span><span class="v">'+w.visibility+'</span></div><div class="stat-line"><span>Risk</span><span class="badge '+(w.risk==='low'?'ok':w.risk==='medium'?'warn':'bad')+'">'+w.risk+'</span></div></div>'):'No weather data'}
+    <hr><div class="tiny muted">Holidays (Nager.Date) — next 60 days</div>${h.length?h.map(x=>'<div class="stat-line"><span>'+esc(x.name)+'</span><span class="v">'+x.date+'</span></div>').join(''):'<div class="muted small">None</div>'}`;
+  };
+  $('#arrPort').onchange=updatePort;updatePort();
+}
+function vesselClass(s){return s==='alongside'?'ok':s==='waiting'?'warn':'info'}
+
+/* ================= REPORTS ================= */
+function renderReports(app){
+  app.innerHTML=`
+  ${pageHead('Reports','Branded PDF &amp; Excel packs — scheduled and on-demand')}
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card"><h3>On-demand</h3>
+    <div class="list">
+      <div class="stat-line"><span>VGM support sheet</span><button class="btn sm" data-rpt="vgm">Generate (PDF)</button></div>
+      <div class="stat-line"><span>Compliance summary</span><button class="btn sm" data-rpt="comp">Generate (XLSX → CSV)</button></div>
+      <div class="stat-line"><span>Data-gap list</span><button class="btn sm" data-rpt="gap">Generate (CSV)</button></div>
+      <div class="stat-line"><span>Weekly executive summary</span><button class="btn sm" data-rpt="exec">Generate (PDF)</button></div>
+    </div></div>
+    <div class="card"><h3>Scheduled delivery</h3>
+    <div class="list">
+      <div class="stat-line"><span>Executive summary · weekly Mon 08:00</span><span class="badge ok">Active</span></div>
+      <div class="stat-line"><span>Data-gap report · daily 06:00</span><span class="badge ok">Active</span></div>
+      <div class="stat-line"><span>Compliance summary · monthly</span><span class="badge neutral">Paused</span></div>
+    </div>
+    <label style="margin-top:10px">Channels</label>
+    <div class="row"><label class="checkbox-row"><input type="checkbox" checked> Email</label><label class="checkbox-row"><input type="checkbox"> Webhook</label></div></div>
+  </div>`;
+  audit('view','reports');
+  $all('[data-rpt]').forEach(b=>b.onclick=()=>generateReport(b.dataset.rpt));
+}
+function generateReport(kind){
+  if(kind==='vgm'){openVgmSheet({id:'CSQU3054383',tare:3700,cargo:26000,vgm:29700,maxGross:30480,maxPayload:26780,within:true,source:'BIC BoxTech'},B.CONTAINERS['CSQU3054383'],B.OWNERS['CSQU']);return}
+  if(kind==='comp'){if(!B.state._lastBulk)runBulk('container,cargo_weight,vessel,port,size_type\nCSQU3054383,26000,MSC Isabella,DEHAM,42G1');const r=B.state._lastBulk;download('boxlens_compliance_summary.csv',csvBuild([['container','cargo','result','reasons']].concat(r.rows.map(x=>[x.id,x.weight,x.result,x.reasons.join('; ')]))),'text/csv');toast('Compliance summary exported');return}
+  if(kind==='gap'){const g=computeDataGap();download('boxlens_datagap.csv',csvBuild([['container','owner','country','status']].concat(g.rows.map(r=>[r.id,r.owner,r.country,r.status]))),'text/csv');toast('Data-gap list exported');return}
+  if(kind==='exec'){execSummaryPdf();return}
+}
+function execSummaryPdf(){
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BoxLens — Executive Summary</title>
+  <style>body{font-family:Arial,sans-serif;margin:32px;color:#111;font-size:12px}h1{font-size:20px;color:#0f766e}h2{font-size:14px;border-bottom:2px solid #0f766e;padding-bottom:4px;margin-top:24px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #ddd;padding:6px;text-align:left}.kpi{display:inline-block;margin-right:24px;text-align:center}.kpi .v{font-size:24px;font-weight:bold;color:#0f766e}.kpi .l{font-size:10px;color:#666}.foot{margin-top:30px;color:#666;font-size:10px;border-top:1px solid #ccc;padding-top:8px}</style></head><body>
+  <h1>BoxLens — Weekly Executive Summary</h1><div class="foot">Tenant: Demo · Week of 2026-11-17 to 2026-11-23</div>
+  <h2>Headline</h2>
+  <div><span class="kpi"><div class="v">1,284</div><div class="l">Containers checked</div></span><span class="kpi"><div class="v">347</div><div class="l">Issues avoided</div></span><span class="kpi"><div class="v">62h</div><div class="l">Time saved</div></span><span class="kpi"><div class="v">86%</div><div class="l">Data coverage</div></span></div>
+  <h2>Compliance</h2><table><tr><th>Result</th><th>Count</th><th>Share</th></tr><tr><td>Pass</td><td>980</td><td>76.3%</td></tr><tr><td>Warning</td><td>142</td><td>11.1%</td></tr><tr><td>Fail</td><td>124</td><td>9.7%</td></tr><tr><td>No data</td><td>38</td><td>3.0%</td></tr></table>
+  <h2>Provider budget</h2><table><tr><th>Provider</th><th>Used</th><th>Cap</th><th>Remaining</th></tr><tr><td>BIC</td><td>127</td><td>6000</td><td>98%</td></tr><tr><td>AIS</td><td>4120</td><td>10000</td><td>59%</td></tr></table>
+  <div class="foot">BoxLens assists only — no certification. Data sources: BIC BoxTech, BIC Codes, aisstream.io, Open-Meteo, Nager.Date. Generated ${new Date().toISOString()}.</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script>
+  </body></html>`);
+  w.document.close();audit('report.exec','');
+}
+
+/* ================= METHODOLOGY ================= */
+function renderMethodology(app){
+  app.innerHTML=`
+  ${pageHead('Data &amp; Methodology','Sources · terms · VGM logic · honesty rules · limitations')}
+  <div class="tabs" id="methTabs"><button data-tab="src" class="active">Data sources &amp; terms</button><button data-tab="vgm">VGM logic</button><button data-tab="rules">Rules &amp; congestion</button><button data-tab="honesty">Honesty rules</button><button data-tab="provenance">Provenance</button></div>
+  <div id="methBody"></div>`;
+  audit('view','methodology');
+  let tab='src';
+  $all('#methTabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;$all('#methTabs button').forEach(x=>x.classList.toggle('active',x===b));renderMeth(tab)});
+  renderMeth('src');
+}
+function renderMeth(tab){
+  const body=$('#methBody');
+  if(tab==='src'){
+    body.innerHTML=`<div class="card"><div class="table-wrap"><table><thead><tr><th>Source</th><th>Purpose</th><th>Attribution</th><th>Commercial use</th><th>Cadence</th><th>Failure mode</th></tr></thead><tbody>
+    <tr><td>BIC BoxTech API</td><td>Container technical &amp; safety data</td><td>BIC</td><td><span class="badge warn">Verify terms</span></td><td>Days–weeks (TTL)</td><td>Stale → badge</td></tr>
+    <tr><td>BIC Codes API</td><td>Owner from 4-letter code</td><td>BIC</td><td><span class="badge warn">Verify terms</span></td><td>Days</td><td>404 → not found</td></tr>
+    <tr><td>BIC Facility Code API</td><td>Facility codes &amp; geofences</td><td>BIC</td><td><span class="badge warn">Verify terms</span></td><td>Weekly refresh</td><td>Stale → badge</td></tr>
+    <tr><td>aisstream.io</td><td>Live AIS positions</td><td>aisstream.io</td><td><span class="badge warn">Confirm plan</span></td><td>Real-time (lag min)</td><td>Lag → age label</td></tr>
+    <tr><td>Open-Meteo Marine</td><td>Wave, swell, wind</td><td>Open-Meteo</td><td><span class="badge warn">Confirm plan</span></td><td>Hourly</td><td>Missing → null</td></tr>
+    <tr><td>Nager.Date</td><td>Public holidays</td><td>Nager.Date</td><td><span class="badge ok">OK</span></td><td>Daily</td><td>404 → none</td></tr>
+    <tr><td>UN/LOCODE</td><td>Port codes &amp; names</td><td>UNECE</td><td><span class="badge ok">Open</span></td><td>Periodic import</td><td>Static</td></tr>
+    <tr><td>Frankfurter (optional)</td><td>Exchange rates</td><td>European Central Bank</td><td><span class="badge ok">OK</span></td><td>Daily</td><td>Missing → last</td></tr>
+    </tbody></table></div>
+    <div class="alert info" style="margin-top:12px"><b>Hard rules:</b> never scrape non-API sites; never bulk-download a provider's database; honour every rate limit &amp; fair-use clause; show required attribution in UI &amp; exports; contact the provider before heavy commercial use.</div>
+    <p class="muted small">This demo build uses <b>sample data</b> modelled on these sources. No live provider calls are made.</p></div>`;
+  } else if(tab==='vgm'){
+    body.innerHTML=`<div class="card"><h3>VGM — Method 2 (SOLAS)</h3><p>VGM = tare weight + weight of cargo + packing + dunnage, entered by the user. BoxLens computes the value and warns if VGM exceeds max gross mass or cargo exceeds max payload.</p>
+    <div class="card-2 mono small">VGM = tare + cargo + packing + dunnage<br>if VGM &gt; max_gross_mass → FAIL (overweight)<br>if cargo &gt; max_payload → FAIL (payload exceeded)</div>
+    <div class="alert warn"><b>Not certified.</b> The declaration sheet is a <b>draft support document</b>. It does not replace the shipper's legal responsibility under SOLAS VI/2. Tare from third-party data may be stale or partial; the shipper must verify.</div>
+    <h3 style="margin-top:16px">ISO 6346 check-digit algorithm</h3>
+    <div class="card-2 mono small">1. Map letters A–Z to values (skip multiples of 11): A=10, B=12, C=13 …<br>2. Multiply each of first 10 chars by 2^position (pos 0..9)<br>3. Sum, mod 11, mod 10 → check digit</div>
+    <div id="methGolden"></div></div>`;
+    const fails=B.runGoldenTests();$('#methGolden')&&($('#methGolden').innerHTML='<div class="alert '+(fails.length?'bad':'ok')+'" style="margin-top:10px">'+(fails.length?'Failures: '+fails.join(', '):'✓ '+B.GOLDEN.length+' golden cases pass')+'</div>');
+  } else if(tab==='rules'){
+    body.innerHTML=`<div class="card"><h3>Rule engine</h3><p>Rules are <b>data, not code</b>, versioned per tenant. Each row result: pass, warning, fail, no-data, with reason codes.</p>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Rule</th><th>Severity</th><th>Description</th></tr></thead><tbody>${B.RULES.map(r=>'<tr><td class="mono">'+r.id+'</td><td>'+esc(r.name)+'</td><td><span class="badge '+sevClass(r.severity)+'">'+r.severity+'</span></td><td class="small">'+esc(r.desc)+'</td></tr>').join('')}</tbody></table></div>
+    <h3 style="margin-top:16px">Congestion score (simple)</h3><div class="card-2 mono small">congestion = min(100, queue_length × 8 + waiting_vessels × 15)</div>
+    <p class="muted small">A heuristic for demo. In production it would weight anchor time, berth utilisation and historical dwell.</p></div>`;
+  } else if(tab==='honesty'){
+    body.innerHTML=`<div class="card"><ol class="list" style="list-style:decimal;padding-left:20px">
+    <li>Never fabricate or silently fill data. Missing means missing.</li>
+    <li>Never present assistance as certification; disclaimers in UI, PDFs and API responses.</li>
+    <li>Respect provider terms and rate limits; the quota manager is mandatory.</li>
+    <li>No hard-coded secrets, no unbounded external calls, no unvalidated input.</li>
+    <li>Every external failure degrades gracefully with a visible state.</li>
+    <li>Keep code typed, tested, linted and documented.</li>
+    <li>AIS shows vessels, not containers. Never claim container-level location.</li>
+    <li>ETAs are estimates with method and age, not facts.</li>
+    </ol></div>`;
+  } else if(tab==='provenance'){
+    body.innerHTML=`<div class="card"><h3>Provenance model</h3><p>Every record carries: <code>source</code>, <code>fetched_at</code>, <code>source_version</code>, and a <code>quality</code> flag.</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+      <div class="card-2">${qualityBadge('ok')}<div class="tiny muted">Source returned full data, fresh.</div></div>
+      <div class="card-2">${qualityBadge('partial')}<div class="tiny muted">Some fields missing.</div></div>
+      <div class="card-2">${qualityBadge('missing')}<div class="tiny muted">No record found.</div></div>
+      <div class="card-2">${qualityBadge('stale')}<div class="tiny muted">Cache older than TTL.</div></div>
+      <div class="card-2">${qualityBadge('conflict')}<div class="tiny muted">Sources disagree.</div></div>
+    </div></div>`;
+  }
+}
+
+/* ================= ADMIN ================= */
+function renderAdmin(app){
+  app.innerHTML=`
+  ${pageHead('Admin console','Tenants · users · plans · provider health · audit log')}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${statTile('3','Tenants')}${statTile('42','Users')}${statTile('1','Plan: Enterprise')}${statTile('99.94%','Uptime (30d)','var(--ok)')}</div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+    <div class="card"><h3>Provider health &amp; budget</h3>
+      <div class="table-wrap"><table><thead><tr><th>Provider</th><th>State</th><th>Latency</th><th>Budget</th><th>Used</th></tr></thead><tbody>
+      ${Object.entries(B.state.providerStatus).map(([k,v])=>{const b=B.state.providerBudget[k];const pct=Math.round(100*b.used/b.cap);return '<tr><td>'+k.toUpperCase()+'</td><td><span class="badge '+(v.state==='ok'?'ok':v.state==='warn'?'warn':'bad')+'">'+v.state+'</span></td><td>'+v.latency+'ms</td><td>'+b.cap+'/'+b.window+'</td><td>'+b.used+' ('+pct+'%)</td></tr>'}).join('')}
+      </tbody></table></div>
+    </div>
+    <div class="card"><h3>Feature flags</h3>
+      <div class="list">
+        <div class="stat-line"><span>Bulk compliance</span><span class="badge ok">on</span></div>
+        <div class="stat-line"><span>Dashboards</span><span class="badge ok">on</span></div>
+        <div class="stat-line"><span>SSO / SAML</span><span class="badge ok">on</span></div>
+        <div class="stat-line"><span>Owner tools (BIC upload)</span><span class="badge neutral">off (hook only)</span></div>
+        <div class="stat-line"><span>WhatsApp alerts</span><span class="badge neutral">off</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>Audit log <span class="tiny muted">(immutable, last 30)</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Action</th><th>Detail</th></tr></thead><tbody>${state.audit.slice(0,30).map(a=>'<tr><td class="tiny mono">'+a.ts.replace('T',' ').slice(0,19)+'</td><td>'+esc(a.action)+'</td><td class="small">'+esc(a.detail)+'</td></tr>').join('')||'<tr><td colspan="3" class="muted center">No events</td></tr>'}</tbody></table></div>
+  </div>`;
+  audit('view','admin');
+}
+
+/* ================= SETTINGS ================= */
+function renderSettings(app){
+  app.innerHTML=`
+  ${pageHead('Settings','Theme · language · units · tenant')}
+  <div class="card">
+    <h3>Appearance</h3>
+    <div class="row">
+      <label>Theme</label>
+      <select id="setTheme"><option value="light">Light</option><option value="dark">Dark</option></select>
+      <label>Language</label>
+      <select id="setLocale"><option value="en">English</option><option value="ar">العربية (RTL)</option></select>
+    </div>
+    <hr>
+    <h3>Units</h3>
+    <div class="row"><label>Weight</label><select><option>kg</option><option>lb</option></select><label>Time zone</label><select><option>UTC</option><option>Europe/Berlin</option><option>Asia/Dubai</option><option>Asia/Singapore</option></select></div>
+    <hr>
+    <h3>Tenant &amp; plan</h3>
+    <div class="card-2"><div class="stat-line"><span>Tenant</span><span class="v">Demo Co.</span></div><div class="stat-line"><span>Plan</span><span class="v">Free</span></div><div class="stat-line"><span>Lookups today</span><span class="v">127 / 50 (demo uncapped)</span></div></div>
+    <hr>
+    <h3>Data</h3>
+    <div class="row"><button class="btn sm" id="clrLocal">Clear local data</button><button class="btn sm" id="exportAudit">Export audit log</button></div>
+  </div>`;
+  $('#setTheme').value=state.theme;$('#setLocale').value=state.locale;
+  $('#setTheme').onchange=e=>{applyTheme(e.target.value)};
+  $('#setLocale').onchange=e=>{applyLocale(e.target.value)};
+  $('#clrLocal').onclick=()=>{['shipments','watchlists','audit','manual'].forEach(k=>{localStorage.removeItem('bl-'+k)});toast('Local data cleared');location.reload()};
+  $('#exportAudit').onclick=()=>download('boxlens_audit.csv',csvBuild([['time','action','detail']].concat(state.audit.map(a=>[a.ts,a.action,a.detail]))),'text/csv');
+}
+
+/* ================= API DOCS ================= */
+function renderApi(app){
+  app.innerHTML=`
+  ${pageHead('API Docs','Versioned REST <span class="mono">/api/v1</span> · OpenAPI · RFC 7807 errors · idempotency keys · HMAC webhooks')}
+  <div class="card"><h3>Base URL</h3><div class="card-2 mono">https://api.boxlens.example/api/v1</div>
+  <h3 style="margin-top:16px">Endpoints</h3>
+  <div class="table-wrap"><table><thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead><tbody>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/containers/{id}</td><td>Validate &amp; look up container (owner, spec, CSC).</td></tr>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/owners/{code}</td><td>Owner from 4-letter BIC code.</td></tr>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/facilities?code=&amp;country=&amp;q=</td><td>Facility directory search.</td></tr>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/facilities/nearest?lat=&amp;lng=</td><td>Nearest facility (PostGIS).</td></tr>
+  <tr><td><span class="badge warn">POST</span></td><td class="mono">/compliance/bulk</td><td>Bulk booking validation (async job).</td></tr>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/compliance/jobs/{id}</td><td>Bulk job status &amp; results.</td></tr>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/vessels?port=</td><td>Vessel positions &amp; arrivals for a port.</td></tr>
+  <tr><td><span class="badge warn">POST</span></td><td class="mono">/vgm/declaration</td><td>Generate draft VGM support sheet (PDF).</td></tr>
+  <tr><td><span class="badge warn">POST</span></td><td class="mono">/shipments</td><td>Create shipment.</td></tr>
+  <tr><td><span class="badge info">GET</span></td><td class="mono">/reports/{type}</td><td>On-demand report.</td></tr>
+  <tr><td><span class="badge bad">POST</span></td><td class="mono">/webhooks</td><td>Register webhook (HMAC-signed).</td></tr>
+  </tbody></table></div>
+  <h3 style="margin-top:16px">Errors (RFC 7807)</h3>
+  <div class="card-2 mono small">HTTP/1.1 429 Too Many Requests<br>Content-Type: application/problem+json<br>Retry-After: 30<br><br>{ "type":"https://boxlens.example/errors/rate-limited",<br>&nbsp;"title":"Rate limited", "status":429,<br>&nbsp;"detail":"Provider budget for BIC exhausted.", "instance":"/containers/CSQU3054383" }</div>
+  <div class="alert info" style="margin-top:12px">Demo build has no live backend. This page documents the intended contract.</div></div>`;
+  audit('view','api');
+}
+
+/* ================= THEME / LOCALE / DRAWER ================= */
+function applyTheme(theme){state.theme=theme;localStorage.setItem('bl-theme',theme);document.documentElement.setAttribute('data-theme',theme);$('#themeBtn').textContent=theme==='dark'?'☀':'🌙';route()}
+function applyLocale(loc){state.locale=loc;document.documentElement.setAttribute('lang',loc);document.documentElement.setAttribute('dir',I18N[loc].dir);$('#localeBtn').textContent=loc.toUpperCase();buildNav();route()}
+function openDrawer(html){const d=$('#drawer');$('#drawerPanel').innerHTML=html+'<button class="btn sm" style="margin-top:12px" data-close-drawer>Close</button>';d.classList.add('open');d.setAttribute('aria-hidden','false')}
+function closeDrawer(){const d=$('#drawer');d.classList.remove('open');d.setAttribute('aria-hidden','true')}
+function showShortcuts(){
+  openDrawer(`<h3>Keyboard shortcuts</h3>
+  <div class="list">
+    <div class="stat-line"><span>Go to Check</span><kbd>g</kbd> <kbd>c</kbd></div>
+    <div class="stat-line"><span>Go to Facilities</span><kbd>g</kbd> <kbd>f</kbd></div>
+    <div class="stat-line"><span>Go to Dashboards</span><kbd>g</kbd> <kbd>d</kbd></div>
+    <div class="stat-line"><span>Go to Arrivals</span><kbd>g</kbd> <kbd>a</kbd></div>
+    <div class="stat-line"><span>Toggle theme</span><kbd>t</kbd></div>
+    <div class="stat-line"><span>Focus search</span><kbd>/</kbd></div>
+    <div class="stat-line"><span>Close drawer</span><kbd>Esc</kbd></div>
+  </div>`);
+}
+
+/* keyboard shortcuts */
+let gKey=false;
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+  if(e.key==='Escape'){closeDrawer();return}
+  if(e.key==='t'){applyTheme(state.theme==='dark'?'light':'dark');return}
+  if(e.key==='/'){const s=document.querySelector('#facSearch,#cnInput,#bulkInput');if(s){e.preventDefault();s.focus()}return}
+  if(e.key==='g'){gKey=true;setTimeout(()=>gKey=false,800);return}
+  if(gKey){const map={c:'#/check',f:'#/facilities',d:'#/dashboards',a:'#/arrivals',w:'#/workflow',m:'#/methodology'};if(map[e.key]){location.hash=map[e.key];gKey=false}}
+});
+
+/* budget pill */
+function updateBudgetPill(){
+  const b=B.state.providerBudget.bic;const pct=Math.round(100*(b.cap-b.used)/b.cap);
+  $('#budgetTxt').textContent='BIC '+pct+'%';
+  $('#budgetPill .bar i').style.width=pct+'%';
+  $('#budgetPill .dot').style.background=pct>50?'var(--ok)':pct>20?'var(--warn)':'var(--bad)';
+}
+
+/* ---------- boot ---------- */
+function boot(){
+  applyTheme(state.theme);
+  document.documentElement.setAttribute('lang',state.locale);
+  document.documentElement.setAttribute('dir',I18N[state.locale].dir);
+  $('#localeBtn').textContent=state.locale.toUpperCase();
+  $('#localeBtn').onclick=()=>applyLocale(state.locale==='en'?'ar':'en');
+  $('#themeBtn').onclick=()=>applyTheme(state.theme==='dark'?'light':'dark');
+  $('#menuBtn').onclick=()=>$('#mobileMenu').classList.toggle('open');
+  $('#budgetPill').onclick=()=>location.hash='#/admin';
+  document.addEventListener('click',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-close-drawer'))closeDrawer()});
+  buildNav();
+  updateBudgetPill();
+  // golden self-test on boot
+  const fails=B.runGoldenTests();
+  if(fails.length)console.warn('ISO 6346 golden test failures:',fails);
+  window.addEventListener('resize',()=>{Object.values(B.state.charts).forEach(c=>{try{c.resize()}catch(e){}})});
+  route();
+}
+boot();
+})();
+</script>
+</body>
+</html>

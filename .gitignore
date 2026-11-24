@@ -1,0 +1,12 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+.env
+.env.*
+!.env.example
+
+# render artifacts (local only)
+/tmp/
+.vercel
