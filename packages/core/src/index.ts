@@ -3,6 +3,7 @@
 // which exposes `window.BoxLensCore` with these namespaces.
 
 export * as iso6346 from './iso6346';
+export * as sizetype from './sizetype';
 export * as vgm from './vgm';
 export * as rules from './rules';
 export * as geo from './geo';

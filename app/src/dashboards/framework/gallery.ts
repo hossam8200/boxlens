@@ -27,7 +27,7 @@ const DASHBOARD_BLURB: Record<string, string> = {
   health:
     'Admin view: per-provider budget used, cache hit-rate, breaker state and API error rate.',
   'classic-analytics':
-    'Legacy dashboards from the classic VGM tool — compliance, coverage, gate & yard, map, arrivals, combo, exec (SAMPLE).',
+    'The seven legacy views from the classic VGM tool — compliance, coverage, gate & operations, facility map, arrivals, combo and exec — rebuilt on real Open-Meteo / World Bank / NASA EONET / USGS / Nager.Date data. No SAMPLE fixtures.',
 };
 
 export interface TileData {

@@ -23,7 +23,7 @@ export const DASHBOARD_CATALOG: ReadonlyArray<DashboardMeta> = Object.freeze([
   { id: 'cost', title: 'Cost & Currency', icon: '💱', dataClass: 'DAILY', order: 6 },
   { id: 'vessel', title: 'Vessel Activity (AIS)', icon: '🚢', dataClass: 'UNAVAILABLE', order: 7 },
   { id: 'health', title: 'Platform Health', icon: '🩺', dataClass: 'LIVE', order: 8 },
-  { id: 'classic-analytics', title: 'Classic Analytics', icon: '📐', dataClass: 'SAMPLE', order: 9 },
+  { id: 'classic-analytics', title: 'Classic Analytics', icon: '📐', dataClass: 'DAILY', order: 9 },
 ]);
 
 const WIDGETS = new Map<string, WidgetDef>();

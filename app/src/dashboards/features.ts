@@ -26,6 +26,23 @@ const SOURCES: ReadonlyArray<SourceInfo> = [
   { name: 'aisstream.io', cls: 'UNAVAILABLE', badgeCls: 'dc-unavailable', limit: '200/day', note: 'Live AIS positions. Needs API key + cron.' },
 ];
 
+interface ToolInfo {
+  icon: string;
+  name: string;
+  badge: string;
+  badgeCls: string;
+  body: string;
+}
+
+const TOOLS: ReadonlyArray<ToolInfo> = [
+  { icon: '🔢', name: 'ISO 6346 check digit', badge: 'OFFLINE', badgeCls: 'dc-live', body: 'Validate any 11-character container number (4 owner letters + 6 serial + 1 check digit) under the authoritative ISO 6346 algorithm, with a one-click suggested correction. CSQU3054383 anchors the Wikipedia worked example.' },
+  { icon: '🔡', name: 'Size/type decoder', badge: 'OFFLINE', badgeCls: 'dc-live', body: 'Decode any 4-character ISO 6346 size/type code (e.g. 22G1 → 20 ft, 8\u20326\u2033, general-purpose) into length, height, type group and category, with ISO 668 nominal tare / max-gross / payload. Pure offline lookup, no network.' },
+  { icon: '⚖️', name: 'VGM Method 2 (SOLAS)', badge: 'DRAFT', badgeCls: 'dc-estimate', body: 'Compute VGM = tare + cargo + packing + dunnage and check it against the container\u2019s max gross and max payload. Labelled a draft — never a certification; the shipper keeps the legal SOLAS VI/2 responsibility.' },
+  { icon: '🏷️', name: 'BIC owner lookup', badge: 'PARTIAL', badgeCls: 'dc-sample', body: 'Resolve a 4-letter owner code to its shipping line (curated subset of the public BIC BoxTech register). Production wires the live BIC Codes API with per-prefix IndexedDB caching.' },
+  { icon: '🗺️', name: 'Port & country filter', badge: 'LIVE', badgeCls: 'dc-daily', body: 'Full UN/LOCODE sea-port search with a cascading country \u2192 port filter — selecting a country narrows the port list to that country only.' },
+  { icon: '🔁', name: 'Honest degradation', badge: 'RULE', badgeCls: 'dc-daily', body: 'Every value keeps a provenance badge (source, fetched-at, status). AIS shows vessels not containers; ETAs are estimates with method and age; missing means missing — never fabricated.' },
+];
+
 const FEAT_BLURB: Record<DashboardId, string> = {
   executive: 'Top KPIs, 30-day check trend, pass/warn/fail mix, top failing rules and active ports.',
   compliance: 'Per-rule pass/warn/fail, ISO 6346 / VGM / BIC coverage, owner-code stats and batch drill-down.',
@@ -35,7 +52,7 @@ const FEAT_BLURB: Record<DashboardId, string> = {
   cost: 'Frankfurter ECB reference FX rates, USD freight index estimate and per-TEU cost conversions.',
   vessel: 'Live AIS positions require an aisstream.io key + cron. Renders UNAVAILABLE without a key.',
   health: 'Admin view: per-provider budget used, cache hit-rate, breaker state and API error rate.',
-  'classic-analytics': 'The legacy dashboards from the classic VGM tool — shipment compliance, data coverage, gate & yard, facility map, arrivals, combo and exec views, rebuilt on the modern chart framework (SAMPLE fixtures).',
+  'classic-analytics': 'The seven legacy views from the classic VGM tool — shipment compliance, data coverage, gate & operations, facility map, arrivals, combo and exec — rebuilt on real Open-Meteo Marine, World Bank, NASA EONET, USGS, Nager.Date and BoxLens risk-engine data. No SAMPLE fixtures.',
 };
 
 const ARCH: ReadonlyArray<{ icon: string; title: string; body: string }> = [
@@ -53,15 +70,15 @@ export function renderFeatures(root: HTMLElement, onSelect: (id: DashboardId) =>
   // ---- Hero ----
   const hero = el('div', { class: 'glass feat-hero' });
   hero.innerHTML =
-    '<div class="feat-hero-eyebrow">BoxLens · v2.3</div>' +
+    '<div class="feat-hero-eyebrow">BoxLens · v2.4</div>' +
     '<h1>Features &amp; Capabilities</h1>' +
-    '<p class="muted">A single application for container-compliance and port intelligence — eight dashboards, ' +
-    'six keyless data sources, honest data-class labelling, and a $0 recurring-cost platform. ' +
-    'Everything below is reachable from this one URL.</p>';
+    '<p class="muted">A single application for container-compliance and port intelligence — nine dashboards, ' +
+    'six keyless data sources, an ISO 6346 + size/type + VGM Method 2 toolset, honest data-class labelling, ' +
+    'and a $0 recurring-cost platform. Everything below is reachable from this one URL.</p>';
   root.appendChild(hero);
 
-  // ---- Eight dashboards ----
-  root.appendChild(sectionHead('Eight dashboards', 'Each is a lazy-loaded view — click a card to open it.'));
+  // ---- Nine dashboards ----
+  root.appendChild(sectionHead('Nine dashboards', 'Each is a lazy-loaded view — click a card to open it.'));
   const dgrid = el('div', { class: 'tile-grid feat-tile-grid' });
   for (const d of DASHBOARD_CATALOG) {
     const meta = DATA_CLASS_META[d.dataClass];
@@ -107,6 +124,19 @@ export function renderFeatures(root: HTMLElement, onSelect: (id: DashboardId) =>
     sgrid.appendChild(card);
   }
   root.appendChild(sgrid);
+
+  // ---- Container & VGM tools ----
+  root.appendChild(sectionHead('Container & VGM tools', 'The native VGM & Container view (no iframe) — pure @boxlens/core logic, free and offline.'));
+  const tgrid = el('div', { class: 'feat-arch-grid' });
+  for (const t of TOOLS) {
+    const card = el('div', { class: 'glass feat-arch' });
+    card.innerHTML =
+      `<div class="feat-arch-icon">${t.icon}</div>` +
+      `<div><div class="feat-arch-title">${esc(t.name)} <span class="dc-badge ${t.badgeCls}"><span class="dot"></span>${t.badge}</span></div>` +
+      `<div class="muted small">${esc(t.body)}</div></div>`;
+    tgrid.appendChild(card);
+  }
+  root.appendChild(tgrid);
 
   // ---- Platform architecture ----
   root.appendChild(sectionHead('Platform architecture', 'Built to run for free, degrade honestly, and stay fast.'));

@@ -17,14 +17,24 @@ describe('tileData', () => {
     expect(exec!.dataClass).toBe('DAILY');
   });
 
-  it('maps each data-class to a badge CSS class', () => {
+  it('maps each present data-class to a badge CSS class', () => {
     const tiles = tileData(DASHBOARD_CATALOG);
     const byClass = new Map(tiles.map((t) => [t.dataClass, t.badgeCls]));
-    expect(byClass.get('SAMPLE')).toBe('dc-sample');
     expect(byClass.get('DAILY')).toBe('dc-daily');
     expect(byClass.get('LIVE')).toBe('dc-live');
     expect(byClass.get('ANNUAL')).toBe('dc-annual');
     expect(byClass.get('UNAVAILABLE')).toBe('dc-unavailable');
+  });
+
+  it('classic-analytics is no longer SAMPLE — it is real DAILY data', () => {
+    const tiles = tileData(DASHBOARD_CATALOG);
+    const classic = tiles.find((t) => t.id === 'classic-analytics');
+    expect(classic).toBeDefined();
+    expect(classic!.dataClass).toBe('DAILY');
+    expect(classic!.badgeCls).toBe('dc-daily');
+    // No dashboard in the catalog is illustrative SAMPLE any more.
+    const sampleDashboards = tiles.filter((t) => t.dataClass === 'SAMPLE');
+    expect(sampleDashboards).toEqual([]);
   });
 
   it('statusHint matches the data-class label', () => {

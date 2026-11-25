@@ -2,7 +2,7 @@
 // the modern shell. NO iframe: imports the real @boxlens/core (ISO 6346 + VGM
 // Method 2) and the ported BIC owner / size-type / container reference data.
 // Reached at #/vgm from the topbar nav — one application, one URL.
-import { iso6346, vgm } from '@boxlens/core';
+import { iso6346, sizetype, vgm } from '@boxlens/core';
 import type { ValidationResult, ContainerSpec } from '@boxlens/core';
 import { el } from './framework/components';
 import { OWNERS, SIZE_TYPES, CONTAINERS, SAMPLE_CONTAINERS } from '../vgm/data';
@@ -57,6 +57,22 @@ export function renderVgm(root: HTMLElement): void {
     'autocomplete="off" autocapitalize="characters" /><button class="btn" id="ownerLookup">Look up</button></div>' +
     '<div id="ownerResult" class="vgm-result"></div>';
   left.appendChild(ownerCard);
+
+  // ---- Size/type decoder card (ISO 6346 Annex A/C, offline) ----
+  const stCard = el('div', { class: 'glass' });
+  stCard.innerHTML =
+    '<h3>Size/type decoder</h3>' +
+    '<div class="tiny muted">Decode any 4-character ISO 6346 size/type code (e.g. 22G1) into length, height, ' +
+    'type group and category, with ISO 668 nominal tare / max-gross / payload. Pure offline lookup.</div>' +
+    '<div class="vgm-row"><input id="stInput" class="mono" maxlength="4" placeholder="e.g. 45G1" ' +
+    'autocomplete="off" autocapitalize="characters" /><button class="btn" id="stDecode">Decode</button></div>' +
+    '<div id="stResult" class="vgm-result"></div>' +
+    '<div class="tiny muted">Try: ' +
+    ['22G1', '45G1', '45R0', '42T1', '22U1', '42P1']
+      .map((s) => `<a href="#" class="vgm-st-sample" data-s="${esc(s)}">${esc(s)}</a>`)
+      .join(', ') +
+    '</div>';
+  left.appendChild(stCard);
 
   // ---- Spec card (right) ----
   const specCard = el('div', { class: 'glass', id: 'specCard' });
@@ -133,6 +149,20 @@ export function renderVgm(root: HTMLElement): void {
     if (e.key === 'Enter') doOwnerLookup(root, $<HTMLInputElement>('#ownerInput')!.value);
   });
 
+  // ---- size/type decoder ----
+  const stInput = $<HTMLInputElement>('#stInput')!;
+  $<HTMLButtonElement>('#stDecode')!.addEventListener('click', () => doDecodeSizeType(stInput.value));
+  stInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doDecodeSizeType(stInput.value);
+  });
+  for (const a of root.querySelectorAll<HTMLAnchorElement>('a.vgm-st-sample')) {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      stInput.value = a.dataset.s ?? '';
+      doDecodeSizeType(a.dataset.s ?? '');
+    });
+  }
+
   $<HTMLButtonElement>('#vgmCalc')!.addEventListener('click', computeVgm);
   $<HTMLButtonElement>('#vgmClear')!.addEventListener('click', () => {
     const c = $<HTMLInputElement>('#vgmCargo')!;
@@ -195,7 +225,8 @@ export function renderVgm(root: HTMLElement): void {
         '<div><label>Tare (kg)</label><input id="mTare" type="number" placeholder="3700" /></div>' +
         '<div><label>Max gross (kg)</label><input id="mMG" type="number" placeholder="30480" /></div>' +
         '<div><label>Max payload (kg)</label><input id="mMP" type="number" placeholder="26780" /></div>' +
-        '</div><button class="btn primary sm" id="saveManual" style="margin-top:10px">Save unverified record</button></details>';
+        '</div><div class="vgm-row" style="margin-top:10px"><button class="btn primary sm" id="saveManual">Save unverified record</button>' +
+        '<button class="btn sm" id="fillNominal" title="Fill tare / max gross / payload from the ISO 668 nominal record for the size/type code">Use nominal ISO 668</button></div></details>';
       vgmCardEl.style.display = 'none';
       $<HTMLButtonElement>('#saveManual')!.addEventListener('click', () => {
         const rec: ContainerSpec = {
@@ -213,6 +244,19 @@ export function renderVgm(root: HTMLElement): void {
         };
         manual[id] = rec;
         renderSpec(r);
+      });
+      $<HTMLButtonElement>('#fillNominal')!.addEventListener('click', () => {
+        const code = $<HTMLInputElement>('#mST')!.value.trim();
+        const s = sizetype.specForSizeType(code);
+        if (!s) {
+          card.querySelector<HTMLElement>('#cnResult');
+          const note = card.querySelector<HTMLElement>('.vgm-manual .tiny.muted');
+          if (note) note.textContent = 'No nominal ISO 668 record for "' + code + '". Try 22G1, 45G1, 45R0, 42G1...';
+          return;
+        }
+        $<HTMLInputElement>('#mTare')!.value = String(s.tare);
+        $<HTMLInputElement>('#mMG')!.value = String(s.maxGross);
+        $<HTMLInputElement>('#mMP')!.value = String(s.maxPayload);
       });
       return;
     }
@@ -280,6 +324,44 @@ function doOwnerLookup(root: HTMLElement, code: string): void {
       '<div class="tiny muted">' + esc(o.city) + ', ' + esc(o.country) + ' · ' + esc(o.contact) + '</div>' +
       '<span class="dc-badge dc-live"><span class="dot"></span>BIC Codes</span></div>'
     : '<div class="vgm-alert vgm-warn">Owner code not in sample set. (BIC Codes API in production.)</div>';
+}
+
+/** Decode an ISO 6346 size/type code with @boxlens/core (offline, no network). */
+function doDecodeSizeType(raw: string): void {
+  const box = document.querySelector<HTMLElement>('#stResult');
+  if (!box) return;
+  const r = sizetype.decodeSizeType(raw);
+  if (!r.normalized) {
+    box.innerHTML = '<div class="vgm-alert vgm-warn">Enter a 4-character size/type code.</div>';
+    return;
+  }
+  const validBadge = r.valid
+    ? '<span class="dc-badge dc-live"><span class="dot"></span>ISO 6346</span>'
+    : '<span class="dc-badge dc-sample"><span class="dot"></span>partial</span>';
+  const spec = sizetype.specForSizeType(raw);
+  const specRows = spec
+    ? kv('Tare', fmt(spec.tare, 'kg')) +
+      kv('Max gross', fmt(spec.maxGross, 'kg')) +
+      kv('Max payload', fmt(spec.maxPayload, 'kg')) +
+      kv('Capacity', esc(String(spec.special?.capacity ?? '—')))
+    : '';
+  const specBadge = spec
+    ? '<span class="dc-badge dc-daily"><span class="dot"></span>ISO 668 nominal</span>'
+    : '<div class="tiny muted">No nominal spec record for this code — enter weights manually.</div>';
+  box.innerHTML =
+    '<div class="spread"><div class="mono"><b>' + esc(r.normalized) + '</b></div>' + validBadge + '</div>' +
+    '<div class="vgm-kv-grid">' +
+    kv('Length', esc(r.lengthLabel)) +
+    kv('Height', esc(r.heightLabel)) +
+    kv('Type group', esc(r.typeGroup)) +
+    kv('Specific', esc(r.typeLabel)) +
+    kv('Category', esc(r.category)) +
+    '</div>' +
+    (r.errors.length ? '<div class="vgm-alert vgm-warn">' + esc(r.errors.join('; ')) + '</div>' : '') +
+    (spec ? '<hr>' + specBadge + '<div class="vgm-kv-grid" style="margin-top:8px">' + specRows + '</div>' : '<hr>' + specBadge) +
+    '<div class="tiny muted" style="margin-top:8px">Source: ' +
+    esc(spec?.source ?? 'ISO 6346 Annex A/C (offline)') +
+    '. Nominal ISO 668 values — verify against the CSC plate for a VGM declaration.</div>';
 }
 
 function drawRecent(root: HTMLElement): void {
