@@ -307,27 +307,29 @@ export interface NearbyFacility {
   distanceKm: number;
 }
 
-const OVERPASS_TIMEOUT_MS = 15000;
+const OVERPASS_TIMEOUT_MS = 12000;
 
 export async function fetchOverpassNearby(
   lat: number,
   lng: number,
   radiusM = 15000,
 ): Promise<{ data: NearbyFacility[]; fetchedAt: number; stale: boolean }> {
+  // Lean query: only the high-signal container-terminal / depot tags. The
+  // broad `industrial=port` tag was dropped — it matches too many features and
+  // made the query time out near dense ports like Rotterdam. Server-side
+  // timeout 12s mirrors the fetch timeout so Overpass stops early.
   const q =
-    `[out:json][timeout:25];(` +
+    `[out:json][timeout:12];(` +
     `node["seamark:type"="cargo_terminal"](around:${radiusM},${lat},${lng});` +
     `way["seamark:type"="cargo_terminal"](around:${radiusM},${lat},${lng});` +
     `node["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
     `way["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
     `node["industrial"="depot"](around:${radiusM},${lat},${lng});` +
     `way["industrial"="depot"](around:${radiusM},${lat},${lng});` +
-    `node["industrial"="port"](around:${radiusM},${lat},${lng});` +
-    `way["industrial"="port"](around:${radiusM},${lat},${lng});` +
-    `);out tags center 40;`;
+    `);out tags center 20;`;
   const INSTANCES = [
-    'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
   ];
   const body = `data=${encodeURIComponent(q)}`;
   const cacheKey = `overpass:${lat.toFixed(2)},${lng.toFixed(2)},${radiusM}`;
