@@ -4,7 +4,7 @@
 import type { FilterState } from '../framework/types';
 import { getDashboardWidgets } from '../framework/registry';
 import { el, unavailableState } from '../framework/components';
-import { pageHeader, fetchAll, unavailableCard } from './_shared';
+import { pageHeader, fetchAll, unavailableCard, tableCell } from './_shared';
 
 export async function render(root: HTMLElement, _filters: FilterState): Promise<void> {
   const defs = getDashboardWidgets('vessel');
@@ -12,16 +12,39 @@ export async function render(root: HTMLElement, _filters: FilterState): Promise<
     title: 'Vessel Activity (AIS)',
     blurb:
       'Live vessel positions require an aisstream.io API key + a GitHub Actions cron that ingests ' +
-      'snapshots into Supabase. Until AISSTREAM_KEY is set, this dashboard renders UNAVAILABLE — ' +
-      'never sample positions presented as live.',
-    note: 'AIS shows vessels, not containers. ETA / congestion / density are ESTIMATE.',
+      'snapshots into Supabase. Until AISSTREAM_KEY is set, AIS widgets render UNAVAILABLE — never ' +
+      'sample positions presented as live. A voyage-ETA showcase gives real (estimated) transit content ' +
+      'for the major container lanes in the meantime.',
+    note: 'AIS shows vessels, not containers. Voyage ETA is an offline ESTIMATE — verify against the carrier schedule.',
   });
 
   const entries = await fetchAll(defs);
 
-  // Two unavailable cards side by side.
+  // Voyage ETA showcase — real (estimated) transit content for major lanes.
+  const voyageEntry = entries.find((e) => e.def.id === 'voyage-eta');
+  if (voyageEntry) {
+    const voyageRows = (voyageEntry.payload.rows ?? []) as Array<Record<string, string | number | null>>;
+    const vGrid = el('div', { class: 'dash-grid' });
+    const vCell = el('div', { class: 'col-12' });
+    vGrid.appendChild(vCell);
+    root.appendChild(vGrid);
+    if (voyageRows.length) {
+      vCell.appendChild(
+        tableCell({
+          title: 'Voyage ETA — major container lanes (chokepoint-aware estimate)',
+          rows: voyageRows,
+          csvName: 'vessel-voyage-eta.csv',
+        }),
+      );
+    } else {
+      vCell.appendChild(unavailableCard(voyageEntry.def, voyageEntry.payload));
+    }
+  }
+
+  // AIS widgets — honest UNAVAILABLE cards side by side.
+  const aisEntries = entries.filter((e) => e.def.id !== 'voyage-eta');
   const grid = el('div', { class: 'dash-grid' });
-  for (const e of entries) {
+  for (const e of aisEntries) {
     const cell = el('div', { class: 'col-6' });
     cell.appendChild(unavailableCard(e.def, e.payload));
     grid.appendChild(cell);

@@ -181,6 +181,10 @@ registerWidget(
   { id: 'ais-port-density', title: 'Port vessel density', endpoint: '/api/v1/dashboards/vessel/ais-port-density', refreshSec: 300, dataClass: 'UNAVAILABLE', cacheTtlSec: 60, fallback: 'unavailable', export: {} },
   'vessel',
 );
+registerWidget(
+  { id: 'voyage-eta', title: 'Voyage ETA (major lanes)', endpoint: '/api/v1/dashboards/vessel/voyage-eta', refreshSec: 604800, dataClass: 'ESTIMATE', cacheTtlSec: 604800, fallback: 'unavailable', export: { csv: true } },
+  'vessel',
+);
 
 // 8. Platform Health — admin (LIVE budget + SAMPLE own-app fixtures).
 registerWidget(

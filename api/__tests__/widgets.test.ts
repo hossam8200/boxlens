@@ -174,3 +174,58 @@ describe('resolveWidget — never throws', () => {
     }
   });
 });
+
+describe('data confirmation — every widget resolves with an honest data class', () => {
+  // resolveWidget has a top-level try/catch, so no widget can reject — every
+  // one resolves to a real payload or an UNAVAILABLE payload. This confirms
+  // each registered widget carries a valid provenance class + a non-empty
+  // source (honest labelling), including the provider-backed dashboards
+  // (weather / chokepoints / trade / cost / vessel) the suite above skips.
+  const VALID = new Set(['LIVE', 'DAILY', 'ANNUAL', 'SAMPLE', 'ESTIMATE', 'UNAVAILABLE']);
+  for (const [dash, ids] of Object.entries(WIDGET_IDS_BY_DASHBOARD) as [DashboardId, string[]][]) {
+    for (const id of ids) {
+      it(`${dash}/${id} resolves with a valid data class + source`, async () => {
+        const p = await resolveWidget(dash, id);
+        expect(p.provenance).toBeDefined();
+        expect(VALID.has(p.provenance.class)).toBe(true);
+        expect(typeof p.provenance.source).toBe('string');
+        expect(p.provenance.source.length).toBeGreaterThan(0);
+      });
+    }
+  }
+});
+
+describe('data confirmation — real widgets carry real data (value + rows)', () => {
+  it('vessel voyage-eta returns an ESTIMATE table of 5 major lanes', async () => {
+    const p = await resolveWidget('vessel', 'voyage-eta');
+    expect(p.provenance.class).toBe('ESTIMATE');
+    expect((p.rows ?? []).length).toBe(5);
+    expect(typeof p.value).toBe('number');
+    expect(p.value as number).toBeGreaterThan(0); // Rotterdam→Shanghai days
+  });
+
+  it('executive port-characteristics carries NGA WPI rows (ANNUAL)', async () => {
+    const p = await resolveWidget('executive', 'port-characteristics');
+    expect(p.provenance.class).toBe('ANNUAL');
+    expect((p.rows ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('executive active-ports carries real per-port rows (DAILY)', async () => {
+    const p = await resolveWidget('executive', 'active-ports');
+    expect(p.provenance.class).toBe('DAILY');
+    expect((p.rows ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('compliance iso-violations counts failing ports (DAILY, real)', async () => {
+    const p = await resolveWidget('compliance', 'iso-violations');
+    expect(p.provenance.class).toBe('DAILY');
+    expect(p.value).toBe(8);
+    expect((p.rows ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('chokepoints eonet-events resolves (LIVE) even when the stub returns no events', async () => {
+    const p = await resolveWidget('chokepoints', 'eonet-events');
+    expect(p.provenance.class).toBe('LIVE');
+    expect(typeof p.value).toBe('number');
+  });
+});

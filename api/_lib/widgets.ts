@@ -693,6 +693,40 @@ async function resolveCostWidget(widgetId: string): Promise<WidgetPayload> {
 // ---- Vessel widgets (aisstream.io — UNAVAILABLE without key) ----
 
 async function resolveVesselWidget(widgetId: string): Promise<WidgetPayload> {
+  // Voyage ETA showcase — real (estimated) transit content for the major
+  // container lanes. Gives the Vessel dashboard genuine content alongside the
+  // honest AIS-unavailable cards. Pure offline (packages/core seaway) — never
+  // depends on the AIS key.
+  if (widgetId === 'voyage-eta') {
+    const LANES = [
+      { from: { name: 'Rotterdam', lat: 51.95, lng: 4.07 }, to: { name: 'Shanghai', lat: 31.22, lng: 121.48 } },
+      { from: { name: 'Shanghai', lat: 31.22, lng: 121.48 }, to: { name: 'Los Angeles', lat: 33.74, lng: -118.27 } },
+      { from: { name: 'Singapore', lat: 1.26, lng: 103.84 }, to: { name: 'Rotterdam', lat: 51.95, lng: 4.07 } },
+      { from: { name: 'Yantian', lat: 22.59, lng: 114.31 }, to: { name: 'Jebel Ali', lat: 25.01, lng: 55.06 } },
+      { from: { name: 'Los Angeles', lat: 33.74, lng: -118.27 }, to: { name: 'Savannah', lat: 32.08, lng: -81.09 } },
+    ];
+    const computed = LANES.map((l) => ({
+      lane: `${l.from.name} \u2192 ${l.to.name}`,
+      r: seaRoute(l.from, l.to),
+    }));
+    const head = computed[0]!;
+    return {
+      value: head.r.etaDays,
+      unit: 'd Rotterdam\u2192Shanghai',
+      provenance: buildProvenance({
+        source: 'BoxLens sea-route estimator (offline)',
+        class: 'ESTIMATE',
+        ttl: 604800,
+        method: METHODS.searoute,
+      }),
+      rows: computed.map((c) => ({
+        Lane: c.lane,
+        Distance: `${c.r.distanceKm} km`,
+        ETA: `${c.r.etaDays} d`,
+        Chokepoints: c.r.chokepoints.length ? c.r.chokepoints.join(' + ') : 'direct',
+      })),
+    };
+  }
   if (!HAS_AIS_KEY) {
     return {
       value: null,
@@ -790,7 +824,7 @@ export const WIDGET_IDS_BY_DASHBOARD: Record<DashboardId, string[]> = {
   chokepoints: ['eonet-events', 'usgs-quakes', 'transit-kpis', 'sea-route'],
   trade: ['trade-gdp-pct', 'container-throughput', 'lpi-overall'],
   cost: ['fx-rates', 'freight-index'],
-  vessel: ['ais-snapshot', 'ais-port-density'],
+  vessel: ['ais-snapshot', 'ais-port-density', 'voyage-eta'],
   health: ['budget-used', 'cache-hit-rate', 'error-rate', 'breaker-state'],
   'classic-analytics': [],
 };
