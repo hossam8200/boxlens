@@ -16,7 +16,7 @@ import {
   fetchUsgsEarthquakes,
   fetchOverpassNearby,
 } from './providers.js';
-import { seaRoute } from '../../packages/core/src/seaway.js';
+import { seaRoute } from './seaway.js';
 import { healthWidget } from './fixtures.js';
 import { getPortConditions, getPortTrend7, portCount } from './portConditions.js';
 import { nearestWpi, WPI_PORT_COUNT } from './portIndex.js';
