@@ -24,7 +24,7 @@ const SOURCES: ReadonlyArray<SourceInfo> = [
   { name: 'Nager.Date', cls: 'DAILY', badgeCls: 'dc-daily', limit: '1,000/day', note: 'Public holidays per country. Keyless.' },
   { name: 'World Bank', cls: 'ANNUAL', badgeCls: 'dc-annual', limit: '4,000/day', note: 'Trade % GDP, port throughput, LPI. Keyless.' },
   { name: 'NGA World Port Index', cls: 'ANNUAL', badgeCls: 'dc-annual', limit: 'embedded', note: 'Pub 150: 5,410 ports — depth, harbor size, max vessel, tidal range. Embedded fixture.' },
-  { name: 'OpenStreetMap Overpass', cls: 'DAILY', badgeCls: 'dc-daily', limit: '500/day', note: 'Nearby container terminals & depots. Keyless (© OSM, ODbL).' },
+  { name: 'OpenStreetMap Overpass', cls: 'UNAVAILABLE', badgeCls: 'dc-unavailable', limit: '500/day', note: 'Nearby terminals & depots. Public instances block cloud IPs — set OVERPASS_URL.' },
   { name: 'aisstream.io', cls: 'UNAVAILABLE', badgeCls: 'dc-unavailable', limit: '200/day', note: 'Live AIS positions. Needs API key + cron.' },
 ];
 
@@ -44,7 +44,7 @@ const TOOLS: ReadonlyArray<ToolInfo> = [
   { icon: '🗺️', name: 'Port & country filter', badge: 'LIVE', badgeCls: 'dc-daily', body: 'Full UN/LOCODE sea-port search with a cascading country \u2192 port filter — selecting a country narrows the port list to that country only.' },
   { icon: '🧭', name: 'Sea route & rough ETA', badge: 'ESTIMATE', badgeCls: 'dc-estimate', body: 'Chokepoint-aware great-circle estimate between two ports: the direct arc is tested against a coarse landmass mask and rerouted via Suez / Panama / Cape of Good Hope / Cape Horn when it would cross a continent. Distance × detour factor, ETA from an explicit assumed speed. Pure offline — verify against the carrier schedule.' },
   { icon: '⚓', name: 'Port characteristics (NGA Pub 150)', badge: 'ANNUAL', badgeCls: 'dc-annual', body: 'Real physical characteristics for every port in scope — channel / cargo-pier / anchorage depth, tidal range, harbor size, max vessel size and entrance restrictions (swell, ice, tide) — from NGA Publication 150 (5,410 ports), matched to each port by nearest coordinate. Embedded fixture, no API key. Verify against current Pub 150 / port notices before navigation.' },
-  { icon: '🏭', name: 'Nearby terminals & depots (OSM)', badge: 'DAILY', badgeCls: 'dc-daily', body: 'Real nearby container terminals, depots and port-industrial sites within 15 km of the representative port, queried live from OpenStreetMap via the Overpass API (© OSM contributors, ODbL). Cached 24 h. OSM coverage is uneven — an empty result means nothing is mapped there, not that no facility exists.' },
+  { icon: '🏭', name: 'Nearby terminals & depots (OSM)', badge: 'PARTIAL', badgeCls: 'dc-sample', body: 'Real nearby container terminals, depots and port-industrial sites within 15 km of the representative port, queried from OpenStreetMap via the Overpass API (© OSM contributors, ODbL). Nodes-only, cached 24 h. ⚠️ The public Overpass instances rate-limit shared cloud egress IPs, so this widget renders UNAVAILABLE on the free Vercel deploy — set OVERPASS_URL to a self-hosted Overpass endpoint for live data. OSM coverage is uneven — empty = not mapped, not absent.' },
   { icon: '🔁', name: 'Honest degradation', badge: 'RULE', badgeCls: 'dc-daily', body: 'Every value keeps a provenance badge (source, fetched-at, status). AIS shows vessels not containers; ETAs are estimates with method and age; missing means missing — never fabricated.' },
 ];
 
@@ -117,7 +117,7 @@ export function renderFeatures(root: HTMLElement, onSelect: (id: DashboardId) =>
   root.appendChild(dleg);
 
   // ---- Data sources ----
-  root.appendChild(sectionHead('Data sources', 'Seven keyless public APIs plus the embedded NGA World Port Index (5,410 ports) and OpenStreetMap Overpass (nearby terminals) power the live, daily and annual widgets — no paid API keys needed.'));
+  root.appendChild(sectionHead('Data sources', 'Seven keyless public APIs plus the embedded NGA World Port Index (5,410 ports) power the live, daily and annual widgets. OpenStreetMap Overpass (nearby terminals) is wired + tested but the public instances block cloud egress IPs — set OVERPASS_URL for live data.'));
   const sgrid = el('div', { class: 'feat-source-grid' });
   for (const s of SOURCES) {
     const card = el('div', { class: 'glass feat-source' });

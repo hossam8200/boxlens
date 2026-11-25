@@ -325,11 +325,17 @@ export async function fetchOverpassNearby(
     `node["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
     `node["industrial"="depot"](around:${radiusM},${lat},${lng});` +
     `);out tags 25;`;
-  const INSTANCES = [
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.openstreetmap.fr/api/interpreter',
-  ];
+  // A self-hosted Overpass endpoint (OVERPASS_URL) is the reliable path: the
+  // public instances rate-limit / block shared cloud egress IPs (Vercel), so the
+  // widget renders UNAVAILABLE on the free cloud deploy without one. When set,
+  // it is used exclusively; otherwise the three public mirrors are tried.
+  const INSTANCES = process.env.OVERPASS_URL
+    ? [process.env.OVERPASS_URL]
+    : [
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
+        'https://overpass.openstreetmap.fr/api/interpreter',
+      ];
   const body = `data=${encodeURIComponent(q)}`;
   const cacheKey = `overpass:${lat.toFixed(2)},${lng.toFixed(2)},${radiusM}`;
   const swr = await getOrFetch(cacheKey, 86_400, async () => {

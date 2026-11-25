@@ -309,11 +309,17 @@ async function resolveExecutiveWidget(
         })),
       };
     } catch (err) {
-      return unavailable(
-        widgetId,
-        'executive',
-        err instanceof Error ? err.message : 'Overpass fetch failed',
-      );
+      const reason = err instanceof Error ? err.message : 'Overpass fetch failed';
+      return {
+        value: null,
+        provenance: buildProvenance({
+          source: 'OpenStreetMap Overpass',
+          class: 'UNAVAILABLE',
+          ttl: 300,
+          attribution: '© OpenStreetMap contributors (ODbL)',
+          method: `Overpass unreachable from this deploy (${reason}). The public instances rate-limit shared cloud egress IPs; set OVERPASS_URL to a self-hosted Overpass endpoint for live nearby-terminal data.`,
+        }),
+      };
     }
   }
   return unavailable(widgetId, 'executive', `Unknown widget "${widgetId}".`);
