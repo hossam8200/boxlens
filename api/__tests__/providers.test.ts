@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { fetchFrankfurterRates } from '../_lib/providers';
+import { fetchFrankfurterRates, fetchOverpassNearby } from '../_lib/providers';
 
 // Mock global fetch for the Frankfurter adapter. The cache (in-memory) is
 // fresh per test file (vitest isolates module graphs), and we use a unique
@@ -49,5 +49,33 @@ describe('fetchFrankfurterRates', () => {
     mockFetch({ base: 'USD', rates: {} });
     const r = await fetchFrankfurterRates('USDY', ['EUR']);
     expect(r.data.rates).toEqual({});
+  });
+});
+
+describe('fetchOverpassNearby', () => {
+  it('parses OSM elements into named facilities, sorted by distance, skipping unnamed', async () => {
+    // Realistic Overpass response: a named cargo-terminal node, a named depot
+    // way (with center), and an unnamed node that must be dropped.
+    mockFetch({
+      elements: [
+        { type: 'node', id: 1, lat: 51.96, lon: 4.1, tags: { name: 'Euromax Terminal', 'seamark:type': 'cargo_terminal' } },
+        { type: 'way', id: 2, center: { lat: 51.94, lon: 4.05 }, tags: { name: 'Maasvlakte Depot', industrial: 'depot' } },
+        { type: 'node', id: 3, lat: 51.97, lon: 4.08, tags: { 'seamark:type': 'cargo_terminal' } },
+      ],
+    });
+    const r = await fetchOverpassNearby(51.95, 4.07, 15000);
+    expect(r.data.length).toBe(2); // unnamed node dropped
+    expect(r.data[0]!.name).toBe('Maasvlakte Depot'); // closer to (51.95,4.07)
+    expect(r.data[0]!.type).toBe('Depot');
+    expect(r.data[1]!.name).toBe('Euromax Terminal');
+    expect(r.data[1]!.type).toBe('Cargo terminal');
+    expect(r.data[0]!.distanceKm).toBeLessThanOrEqual(r.data[1]!.distanceKm);
+    expect(r.stale).toBe(false);
+  });
+
+  it('returns an empty list (not a throw) when Overpass has no elements', async () => {
+    mockFetch({ elements: [] });
+    const r = await fetchOverpassNearby(40.0, -40.0, 15000); // unique coord -> no cache collision
+    expect(r.data).toEqual([]);
   });
 });

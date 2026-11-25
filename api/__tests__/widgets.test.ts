@@ -74,6 +74,25 @@ describe('resolveWidget — executive (real operational conditions)', () => {
     expect((p.rows ?? []).length).toBeGreaterThan(0);
   });
 
+  it('nearby-terminals degrades to UNAVAILABLE when OSM has no mapped facilities (graceful)', async () => {
+    // The global fetch stub returns the Open-Meteo body for every call, so the
+    // Overpass response has no `elements` array -> the widget must return a
+    // clean UNAVAILABLE (0 facilities) payload, never throw.
+    const p = await resolveWidget('executive', 'nearby-terminals');
+    expect(p.provenance.source).toMatch(/OpenStreetMap/);
+    expect(p.provenance.class).toBe('UNAVAILABLE');
+    expect(p.value).toBe(0);
+  });
+
+  it('sea-route showcase returns an ESTIMATE table of major lanes with real distances', async () => {
+    const p = await resolveWidget('chokepoints', 'sea-route');
+    expect(p.provenance.class).toBe('ESTIMATE');
+    expect(p.provenance.source).toMatch(/sea-route estimator/);
+    expect((p.rows ?? []).length).toBe(5);
+    expect(typeof p.value).toBe('number');
+    expect(p.value as number).toBeGreaterThan(0); // Rotterdam -> Shanghai distance
+  });
+
   it('free-tier-budget is LIVE quota (not weather)', async () => {
     const p = await resolveWidget('executive', 'free-tier-budget');
     expect(p.provenance.class).toBe('LIVE');

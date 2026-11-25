@@ -14,7 +14,9 @@ import {
   fetchWorldBankIndicator,
   fetchEonetEvents,
   fetchUsgsEarthquakes,
+  fetchOverpassNearby,
 } from './providers.js';
+import { seaRoute } from '../../packages/core/src/seaway.js';
 import { healthWidget } from './fixtures.js';
 import { getPortConditions, getPortTrend7, portCount } from './portConditions.js';
 import { nearestWpi, WPI_PORT_COUNT } from './portIndex.js';
@@ -60,6 +62,17 @@ const METHODS = {
     ' ports indexed. Port particulars are not comprehensive and may change ' +
     'without notice \u2014 verify against current NGA Pub 150 / port authority ' +
     'notices before any navigation decision.',
+  searoute:
+    'Chokepoint-aware great-circle estimate: the direct arc is tested against a ' +
+    'coarse landmass mask and rerouted via Suez / Panama / Cape of Good Hope / ' +
+    'Cape Horn when it would cross a continent. Distance \u00d7 1.2 detour factor; ' +
+    'ETA = distance \u00f7 assumed 18 kn. Pure offline computation \u2014 verify ' +
+    'against the carrier schedule.',
+  nearby:
+    'Container terminals, depots and port-industrial sites within 15 km of the ' +
+    'representative port, queried live from OpenStreetMap via the Overpass API ' +
+    '(\u00a9 OSM contributors, ODbL). Cached 24 h. OSM coverage is uneven \u2014 an ' +
+    'empty result means nothing is mapped there, not that no facility exists.',
 };
 
 /** Resolve a single widget payload, never throwing. */
@@ -255,6 +268,53 @@ async function resolveExecutiveWidget(
         { Field: 'Match distance', Value: `${m.distanceKm} km` },
       ],
     };
+  }
+  if (widgetId === 'nearby-terminals') {
+    // Real nearby container terminals / depots from OpenStreetMap Overpass.
+    const port = ports[0]!;
+    if (!port) return unavailable(widgetId, 'executive', 'No port in scope.');
+    try {
+      const r = await fetchOverpassNearby(port.lat, port.lng, 15000);
+      if (!r.data.length) {
+        return {
+          value: 0,
+          unit: 'nearby facilities',
+          provenance: buildProvenance({
+            source: 'OpenStreetMap Overpass',
+            class: 'UNAVAILABLE',
+            ttl: 86400,
+            stale: r.stale,
+            attribution: '© OpenStreetMap contributors (ODbL)',
+            method: `No container terminals or depots mapped within 15 km of ${port.name} in OpenStreetMap. OSM coverage is uneven \u2014 this is not an absence of facilities, only of mapped data.`,
+          }),
+        };
+      }
+      return {
+        value: r.data.length,
+        unit: 'nearby facilities',
+        provenance: buildProvenance({
+          source: 'OpenStreetMap Overpass',
+          class: 'DAILY',
+          ttl: 86400,
+          stale: r.stale,
+          attribution: '© OpenStreetMap contributors (ODbL)',
+          method: METHODS.nearby,
+        }),
+        rows: r.data.slice(0, 15).map((f) => ({
+          Facility: f.name,
+          Type: f.type,
+          Distance: `${f.distanceKm} km`,
+          Lat: f.lat,
+          Lng: f.lng,
+        })),
+      };
+    } catch (err) {
+      return unavailable(
+        widgetId,
+        'executive',
+        err instanceof Error ? err.message : 'Overpass fetch failed',
+      );
+    }
   }
   return unavailable(widgetId, 'executive', `Unknown widget "${widgetId}".`);
 }
@@ -520,6 +580,40 @@ async function resolveChokepointsWidget(widgetId: string): Promise<WidgetPayload
       }),
     };
   }
+  if (widgetId === 'sea-route') {
+    // Chokepoint-aware sea-distance + ETA showcase for major container lanes.
+    // Pure offline computation (packages/core seaway) — gives the Chokepoints
+    // dashboard real transit content where IMF PortWatch is UNAVAILABLE.
+    const LANES = [
+      { from: { name: 'Rotterdam', lat: 51.95, lng: 4.07 }, to: { name: 'Shanghai', lat: 31.22, lng: 121.48 } },
+      { from: { name: 'Shanghai', lat: 31.22, lng: 121.48 }, to: { name: 'Los Angeles', lat: 33.74, lng: -118.27 } },
+      { from: { name: 'Rotterdam', lat: 51.95, lng: 4.07 }, to: { name: 'Los Angeles', lat: 33.74, lng: -118.27 } },
+      { from: { name: 'Singapore', lat: 1.26, lng: 103.84 }, to: { name: 'Rotterdam', lat: 51.95, lng: 4.07 } },
+      { from: { name: 'Shanghai', lat: 31.22, lng: 121.48 }, to: { name: 'Hamburg', lat: 53.54, lng: 9.98 } },
+    ];
+    const computed = LANES.map((l) => ({
+      lane: `${l.from.name} \u2192 ${l.to.name}`,
+      r: seaRoute(l.from, l.to),
+    }));
+    const head = computed[0]!;
+    return {
+      value: head.r.distanceKm,
+      unit: 'km Rotterdam\u2192Shanghai',
+      provenance: buildProvenance({
+        source: 'BoxLens sea-route estimator (offline)',
+        class: 'ESTIMATE',
+        ttl: 604800,
+        method: METHODS.searoute,
+      }),
+      rows: computed.map((c) => ({
+        Lane: c.lane,
+        Distance: `${c.r.distanceKm} km`,
+        'Naut. mi': c.r.distanceNm,
+        ETA: `${c.r.etaDays} d`,
+        Chokepoints: c.r.chokepoints.length ? c.r.chokepoints.join(' + ') : 'direct',
+      })),
+    };
+  }
   return unavailable(widgetId, 'chokepoints', `Unknown widget "${widgetId}".`);
 }
 
@@ -683,10 +777,11 @@ export const WIDGET_IDS_BY_DASHBOARD: Record<DashboardId, string[]> = {
     'active-ports',
     'top-failures',
     'port-characteristics',
+    'nearby-terminals',
   ],
   compliance: ['rule-matrix', 'owner-coverage', 'iso-violations', 'vgm-overweight'],
   weather: ['marine-snapshot', 'risk-score', 'holidays'],
-  chokepoints: ['eonet-events', 'usgs-quakes', 'transit-kpis'],
+  chokepoints: ['eonet-events', 'usgs-quakes', 'transit-kpis', 'sea-route'],
   trade: ['trade-gdp-pct', 'container-throughput', 'lpi-overall'],
   cost: ['fx-rates', 'freight-index'],
   vessel: ['ais-snapshot', 'ais-port-density'],

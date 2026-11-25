@@ -14,8 +14,8 @@ export async function render(root: HTMLElement, _filters: FilterState): Promise<
     title: 'Chokepoints & Disruptions',
     blurb:
       'NASA EONET storms/fires/volcanoes and USGS M≥4.5 earthquakes plotted on a world hazard map. ' +
-      'IMF PortWatch transit KPIs are UNAVAILABLE — the source has no public REST API.',
-    note: 'EONET + USGS refresh hourly (cache TTL 1h). Live data, not sample.',
+      'IMF PortWatch transit KPIs are UNAVAILABLE (no public REST API); a chokepoint-aware sea-route showcase gives real transit distances + rough ETAs for the major container lanes instead.',
+    note: 'EONET + USGS refresh hourly (cache TTL 1h). Sea route is an offline ESTIMATE (verify against the carrier schedule).',
   });
 
   const entries = await fetchAll(defs);
@@ -90,6 +90,28 @@ export async function render(root: HTMLElement, _filters: FilterState): Promise<
   grid3.appendChild(uCell);
   root.appendChild(grid3);
   uCell.appendChild(unavailableCard(defs.find((d) => d.id === 'transit-kpis')!, transit));
+
+  // Sea route & ETA showcase (chokepoint-aware, offline estimate) — real
+  // transit-distance content for the major container lanes.
+  const seaRouteEntry = entries.find((e) => e.def.id === 'sea-route');
+  if (seaRouteEntry) {
+    const srRows = (seaRouteEntry.payload.rows ?? []) as Array<Record<string, string | number | null>>;
+    const srGrid = el('div', { class: 'dash-grid' });
+    const srCell = el('div', { class: 'col-12' });
+    srGrid.appendChild(srCell);
+    root.appendChild(srGrid);
+    if (srRows.length) {
+      srCell.appendChild(
+        tableCell({
+          title: 'Sea route & rough ETA — major container lanes',
+          rows: srRows,
+          csvName: 'chokepoints-sea-route.csv',
+        }),
+      );
+    } else {
+      srCell.appendChild(unavailableCard(seaRouteEntry.def, seaRouteEntry.payload));
+    }
+  }
   void entries;
 }
 

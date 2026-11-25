@@ -91,6 +91,10 @@ registerWidget(
   { id: 'port-characteristics', title: 'Port characteristics (NGA Pub 150)', endpoint: '/api/v1/dashboards/executive/port-characteristics', refreshSec: 604800, dataClass: 'ANNUAL', cacheTtlSec: 604800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
+registerWidget(
+  { id: 'nearby-terminals', title: 'Nearby terminals & depots (OSM)', endpoint: '/api/v1/dashboards/executive/nearby-terminals', refreshSec: 86400, dataClass: 'DAILY', cacheTtlSec: 86400, fallback: 'unavailable', export: { csv: true } },
+  'executive',
+);
 
 // 2. Compliance Quality — real operational compliance from Open-Meteo marine
 // conditions per port (DAILY); vgm-overweight is an ESTIMATE proxy (no free
@@ -137,6 +141,10 @@ registerWidget(
 );
 registerWidget(
   { id: 'transit-kpis', title: 'IMF PortWatch transit KPIs', endpoint: '/api/v1/dashboards/chokepoints/transit-kpis', refreshSec: 3600, dataClass: 'UNAVAILABLE', cacheTtlSec: 60, fallback: 'unavailable', export: {} },
+  'chokepoints',
+);
+registerWidget(
+  { id: 'sea-route', title: 'Sea route & ETA (major lanes)', endpoint: '/api/v1/dashboards/chokepoints/sea-route', refreshSec: 604800, dataClass: 'ESTIMATE', cacheTtlSec: 604800, fallback: 'unavailable', export: { csv: true } },
   'chokepoints',
 );
 

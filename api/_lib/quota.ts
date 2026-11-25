@@ -73,6 +73,7 @@ export const PROVIDER_LIMITS: Record<string, ProviderLimit> = {
   eonet: { limit: 2000, windowSec: 86_400 },
   usgs: { limit: 2000, windowSec: 86_400 },
   aisstream: { limit: 200, windowSec: 86_400 },
+  overpass: { limit: 500, windowSec: 86_400 }, // OSM Overpass public instance (rate-limited ~2 req/s)
   imf: { limit: 0, windowSec: 86_400 }, // no free API -> always blocked
 };
 

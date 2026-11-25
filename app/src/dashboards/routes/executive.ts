@@ -7,7 +7,7 @@ import { getDashboardWidgets } from '../framework/registry';
 import { kpiCard, drilldownTable, el, unavailableState } from '../framework/components';
 import { lineChart, donutChart, barChart } from '../framework/charts';
 import { dashMap } from '../framework/map';
-import { pageHeader, kpiRow, fetchAll, chartCell, tableCell, pctDelta } from './_shared';
+import { pageHeader, kpiRow, fetchAll, chartCell, tableCell, pctDelta, unavailableCard } from './_shared';
 
 export async function render(root: HTMLElement, filters: FilterState): Promise<void> {
   const defs = getDashboardWidgets('executive');
@@ -177,6 +177,27 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
         csvName: 'executive-port-characteristics.csv',
       }),
     );
+  }
+
+  // ---- Nearby terminals & depots (OpenStreetMap Overpass) ----
+  const nearbyEntry = entries.find((e) => e.def.id === 'nearby-terminals');
+  if (nearbyEntry) {
+    const nearbyRows = (nearbyEntry.payload.rows ?? []) as Array<Record<string, string | number | null>>;
+    const grid5 = el('div', { class: 'dash-grid' });
+    const nearbyCell = el('div', { class: 'col-12' });
+    grid5.appendChild(nearbyCell);
+    root.appendChild(grid5);
+    if (nearbyRows.length) {
+      nearbyCell.appendChild(
+        tableCell({
+          title: 'Nearby terminals & depots — OpenStreetMap (representative port, 15 km)',
+          rows: nearbyRows,
+          csvName: 'executive-nearby-terminals.csv',
+        }),
+      );
+    } else {
+      nearbyCell.appendChild(unavailableCard(nearbyEntry.def, nearbyEntry.payload));
+    }
   }
 
   // Suppress unused-import warning for kpiCard/drilldownTable (kept for editor

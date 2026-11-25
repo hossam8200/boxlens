@@ -283,3 +283,106 @@ export async function fetchUsgsEarthquakes(): Promise<{ data: QuakeRow[]; fetche
   });
   return { data: swr.value, fetchedAt: swr.fetchedAt, stale: swr.stale };
 }
+
+// ---- OpenStreetMap Overpass (nearby container terminals / depots) ----
+// Keyless, free (public instance, rate-limited). OSM data is crowd-sourced
+// and uneven — an empty result means nothing is *mapped* there, not that no
+// facility exists. Cached 24 h; © OpenStreetMap contributors, ODbL.
+
+function havKm(la1: number, lo1: number, la2: number, lo2: number): number {
+  const R = 6371;
+  const dLat = ((la2 - la1) * Math.PI) / 180;
+  const dLon = ((lo2 - lo1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((la1 * Math.PI) / 180) * Math.cos((la2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export interface NearbyFacility {
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  distanceKm: number;
+}
+
+const OVERPASS_TIMEOUT_MS = 15000;
+
+export async function fetchOverpassNearby(
+  lat: number,
+  lng: number,
+  radiusM = 15000,
+): Promise<{ data: NearbyFacility[]; fetchedAt: number; stale: boolean }> {
+  const q =
+    `[out:json][timeout:25];(` +
+    `node["seamark:type"="cargo_terminal"](around:${radiusM},${lat},${lng});` +
+    `way["seamark:type"="cargo_terminal"](around:${radiusM},${lat},${lng});` +
+    `node["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
+    `way["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
+    `node["industrial"="depot"](around:${radiusM},${lat},${lng});` +
+    `way["industrial"="depot"](around:${radiusM},${lat},${lng});` +
+    `node["industrial"="port"](around:${radiusM},${lat},${lng});` +
+    `way["industrial"="port"](around:${radiusM},${lat},${lng});` +
+    `);out tags center 40;`;
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`;
+  const cacheKey = `overpass:${lat.toFixed(2)},${lng.toFixed(2)},${radiusM}`;
+  const swr = await getOrFetch(cacheKey, 86_400, async () => {
+    const breaker = getBreaker('overpass');
+    if (!breaker.canRequest()) throw new Error('overpass circuit open');
+    const quota = await checkAndIncrement('overpass');
+    if (!quota.allowed) throw new Error('overpass quota exhausted');
+    try {
+      const res = await withTimeout(
+        fetch(url, { headers: { accept: 'application/json' } }),
+        OVERPASS_TIMEOUT_MS,
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      breaker.recordSuccess();
+      return json;
+    } catch (err) {
+      breaker.recordFailure();
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  });
+  const els = (
+    swr.value as {
+      elements?: Array<{
+        type: string;
+        lat?: number;
+        lon?: number;
+        center?: { lat: number; lon: number };
+        tags?: Record<string, string>;
+      }>;
+    }
+  ).elements ?? [];
+  const out: NearbyFacility[] = [];
+  for (const e of els) {
+    const t = e.tags ?? {};
+    const name = t.name ?? t['seamark:name'] ?? '';
+    if (!name) continue;
+    const elat = e.lat ?? e.center?.lat;
+    const elng = e.lon ?? e.center?.lon;
+    if (typeof elat !== 'number' || typeof elng !== 'number') continue;
+    const type =
+      t['seamark:type'] === 'cargo_terminal'
+        ? 'Cargo terminal'
+        : t.man_made === 'container_terminal'
+          ? 'Container terminal'
+          : t.industrial === 'depot'
+            ? 'Depot'
+            : t.industrial === 'port'
+              ? 'Port industrial'
+              : 'Facility';
+    out.push({
+      name,
+      type,
+      lat: Math.round(elat * 1e4) / 1e4,
+      lng: Math.round(elng * 1e4) / 1e4,
+      distanceKm: Math.round(havKm(lat, lng, elat, elng) * 10) / 10,
+    });
+  }
+  out.sort((a, b) => a.distanceKm - b.distanceKm);
+  return { data: out.slice(0, 20), fetchedAt: swr.fetchedAt, stale: swr.stale };
+}
