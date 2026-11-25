@@ -5,7 +5,7 @@ import type { FilterState, WidgetPayload } from '../framework/types';
 import { getDashboardWidgets } from '../framework/registry';
 import { el } from '../framework/components';
 import { barChart } from '../framework/charts';
-import { pageHeader, fetchAll, chartCell, tableCell } from './_shared';
+import { pageHeader, fetchAll, chartCell } from './_shared';
 
 export async function render(root: HTMLElement, _filters: FilterState): Promise<void> {
   const defs = getDashboardWidgets('trade');
@@ -84,7 +84,7 @@ export async function render(root: HTMLElement, _filters: FilterState): Promise<
     }),
   );
 
-  // LPI table
+  // LPI — top 20 horizontal bar chart (ranked by score, purple palette)
   const grid2 = el('div', { class: 'dash-grid' });
   const lpiCell = el('div', { class: 'col-12' });
   grid2.appendChild(lpiCell);
@@ -95,10 +95,21 @@ export async function render(root: HTMLElement, _filters: FilterState): Promise<
     .sort((a, b) => Number(b.Value) - Number(a.Value))
     .slice(0, 20);
   lpiCell.appendChild(
-    tableCell({
+    await chartCell({
       title: 'Logistics Performance Index — top 20',
+      provenance: lpi.provenance,
       rows: topLpi.map((r) => ({ Country: r.Country, Score: r.Value })),
       csvName: 'trade-lpi.csv',
+      render: async (body) => {
+        body.style.height = '460px';
+        const h = await barChart(
+          body,
+          topLpi.map((r) => String(r.Country)),
+          [{ name: 'LPI score', data: topLpi.map((r) => Number(r.Value)), color: '#7c3aed' }],
+          { horizontal: true },
+        );
+        void h;
+      },
     }),
   );
 }

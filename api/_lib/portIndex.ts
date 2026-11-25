@@ -85,6 +85,25 @@ export function nearestWpi(lat: number, lng: number, maxKm = 10): WpiMatch | nul
   return tier1 ?? tier2;
 }
 
+/**
+ * Nearest NAMED WPI ports to a coordinate, within `maxKm` (default 60), sorted
+ * by distance ascending. Used by the nearby-terminals widget to list real
+ * port/terminal facilities around the scoped port (diversion / alternative
+ * berths) without depending on Overpass, which is unreachable from shared cloud
+ * egress IPs. Unnamed sub-facility soundings are skipped (no display value).
+ */
+export function nearestWpiList(lat: number, lng: number, maxKm = 60, limit = 16): WpiMatch[] {
+  const out: WpiMatch[] = [];
+  for (const p of PORTS) {
+    if (!p.name) continue;
+    const d = havKm(lat, lng, p.lat, p.lng);
+    if (d > maxKm) continue;
+    out.push({ ...p, distanceKm: Math.round(d * 10) / 10 });
+  }
+  out.sort((a, b) => a.distanceKm - b.distanceKm);
+  return out.slice(0, limit);
+}
+
 /** Compact enrichment shape attached to a PortCond row. */
 export interface PortEnrichment {
   depthM: number | null;

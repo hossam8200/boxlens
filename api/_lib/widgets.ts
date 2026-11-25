@@ -15,12 +15,11 @@ import {
   fetchWorldBankCountries,
   fetchEonetEvents,
   fetchUsgsEarthquakes,
-  fetchOverpassNearby,
 } from './providers.js';
 import { seaRoute } from './seaway.js';
 import { healthWidget } from './fixtures.js';
 import { getPortConditions, getPortTrend7, portCount } from './portConditions.js';
-import { nearestWpi, WPI_PORT_COUNT } from './portIndex.js';
+import { nearestWpi, nearestWpiList, WPI_PORT_COUNT } from './portIndex.js';
 import type { DashboardId, WidgetPayload, Provenance, DataClass } from '../../app/src/dashboards/framework/types.js';
 import type { ProviderLimit } from './quota.js';
 import { PROVIDER_LIMITS, quotaSnapshot } from './quota.js';
@@ -70,10 +69,12 @@ const METHODS = {
     'ETA = distance \u00f7 assumed 18 kn. Pure offline computation \u2014 verify ' +
     'against the carrier schedule.',
   nearby:
-    'Container terminals, depots and port-industrial sites within 15 km of the ' +
-    'representative port, queried live from OpenStreetMap via the Overpass API ' +
-    '(\u00a9 OSM contributors, ODbL). Cached 24 h. OSM coverage is uneven \u2014 an ' +
-    'empty result means nothing is mapped there, not that no facility exists.',
+    'Nearby ports and terminals within 60 km of the representative port, from ' +
+    'the NGA World Port Index (Pub 150, 2019 ed.) — great-circle distance over ' +
+    `the ${WPI_PORT_COUNT} indexed ports. Static reference dataset (refreshed ` +
+    'periodically by NGA); the scoped port itself is excluded when it is the ' +
+    'nearest match, so the table lists other nearby facilities. Small terminals ' +
+    'and inland depots may not be indexed — verify against local port-authority data.',
 };
 
 /** Resolve a single widget payload, never throwing. */
@@ -271,57 +272,54 @@ async function resolveExecutiveWidget(
     };
   }
   if (widgetId === 'nearby-terminals') {
-    // Real nearby container terminals / depots from OpenStreetMap Overpass.
+    // Real nearby ports/terminals from the NGA World Port Index (Pub 150) —
+    // replaces OpenStreetMap Overpass, which rate-limits / blocks shared cloud
+    // egress IPs and left this widget UNAVAILABLE in production. Great-circle
+    // distance over the indexed ports; the dataset is static (2019 ed.) so it
+    // is presented as ANNUAL, never live.
     const port = ports[0]!;
     if (!port) return unavailable(widgetId, 'executive', 'No port in scope.');
-    try {
-      const r = await fetchOverpassNearby(port.lat, port.lng, 15000);
-      if (!r.data.length) {
-        return {
-          value: 0,
-          unit: 'nearby facilities',
-          provenance: buildProvenance({
-            source: 'OpenStreetMap Overpass',
-            class: 'UNAVAILABLE',
-            ttl: 86400,
-            stale: r.stale,
-            attribution: '© OpenStreetMap contributors (ODbL)',
-            method: `No container terminals or depots mapped within 15 km of ${port.name} in OpenStreetMap. OSM coverage is uneven \u2014 this is not an absence of facilities, only of mapped data.`,
-          }),
-        };
-      }
+    const list = nearestWpiList(port.lat, port.lng, 60, 16);
+    // Drop the scoped port's own WPI match when it is the nearest record and
+    // clearly the same facility (< 2 km) — the table then lists OTHER nearby
+    // facilities (diversion / alternative berths), not the port itself.
+    const others = list.length && list[0]!.distanceKm < 2 ? list.slice(1) : list;
+    if (!others.length) {
       return {
-        value: r.data.length,
+        value: 0,
         unit: 'nearby facilities',
         provenance: buildProvenance({
-          source: 'OpenStreetMap Overpass',
-          class: 'DAILY',
-          ttl: 86400,
-          stale: r.stale,
-          attribution: '© OpenStreetMap contributors (ODbL)',
-          method: METHODS.nearby,
-        }),
-        rows: r.data.slice(0, 15).map((f) => ({
-          Facility: f.name,
-          Type: f.type,
-          Distance: `${f.distanceKm} km`,
-          Lat: f.lat,
-          Lng: f.lng,
-        })),
-      };
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : 'Overpass fetch failed';
-      return {
-        value: null,
-        provenance: buildProvenance({
-          source: 'OpenStreetMap Overpass',
+          source: 'NGA World Port Index (Pub 150)',
           class: 'UNAVAILABLE',
-          ttl: 300,
-          attribution: '© OpenStreetMap contributors (ODbL)',
-          method: `Overpass unreachable from this deploy (${reason}). The public instances rate-limit shared cloud egress IPs; set OVERPASS_URL to a self-hosted Overpass endpoint for live nearby-terminal data.`,
+          ttl: 604800,
+          attribution: 'NGA Publication 150 (2019 ed.)',
+          method: `No other World Port Index facility within 60 km of ${port.name}. The WPI covers ${WPI_PORT_COUNT} ports; small terminals and inland depots may not be indexed — verify against local port-authority data.`,
         }),
       };
     }
+    const nearest = others[0]!;
+    return {
+      value: others.length,
+      unit: 'nearby facilities',
+      provenance: buildProvenance({
+        source: 'NGA World Port Index (Pub 150)',
+        class: 'ANNUAL',
+        ttl: 604800,
+        attribution: 'NGA Publication 150 (2019 ed.) — great-circle distance',
+        method:
+          `${others.length} indexed port${others.length === 1 ? '' : 's'} within 60 km of ${port.name}. ` +
+          `Nearest other facility: ${nearest.name} (${nearest.country}), ${nearest.distanceKm} km. ` +
+          METHODS.nearby,
+      }),
+      rows: others.map((p) => ({
+        Facility: p.name,
+        Country: p.country,
+        Distance: `${p.distanceKm} km`,
+        'Depth (m)': p.depth_m ?? '—',
+        'Max vessel': p.max_vessel || '—',
+        'Harbor size': p.port_size || '—',
+      })),
+    };
   }
   return unavailable(widgetId, 'executive', `Unknown widget "${widgetId}".`);
 }
@@ -645,9 +643,8 @@ async function resolveTradeWidget(widgetId: string): Promise<WidgetPayload> {
   const ranked = r.data
     .filter((x) => x.value !== null && x.iso3.length === 3 && countries.has(x.iso3))
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-  const top = ranked[0];
   return {
-    value: top ? (top.value as number) : null,
+    value: ranked.length,
     unit: ind.unit,
     provenance: buildProvenance({
       source: `World Bank — ${ind.name}`,

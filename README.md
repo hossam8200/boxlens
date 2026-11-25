@@ -63,6 +63,28 @@ source. See [`CHANGELOG.md`](CHANGELOG.md) for version history.
 | **Admin** | Provider health + budget, feature flags, plans, and an immutable-style audit log. |
 | **API docs** | The intended `/api/v1` contract (versioned, RFC 7807 errors, idempotency keys, HMAC webhooks). |
 
+## Features & Capabilities
+
+A visual tour of the platform lives at [`boxlens-features.html`](./boxlens-features.html) —
+an enterprise slide deck (CSS scroll-snapping, glassmorphism, real container-terminal
+imagery) showcasing every capability below. Open it directly or at
+`https://boxlens.vercel.app/boxlens-features.html`.
+
+| Pillar | What it does | Data source | Class |
+| --- | --- | --- | --- |
+| **Container compliance** | ISO 6346 check-digit validation (re-computed, not looked up), BIC owner + BoxTech technical/safety data, manual-entry unverified path. | BIC Codes, BIC BoxTech, ISO 6346 | LIVE / ANNUAL |
+| **VGM Method 2** | Tare + cargo arithmetic, overweight/payload warnings, DRAFT declaration sheet (never certified), smart search + ISO 6346 anatomy. | arithmetic | ESTIMATE |
+| **Port intelligence** | Nearest-port matching by great-circle distance; channel/pier/anchorage depth, tidal range, harbor size, max vessel, entrance restrictions; **nearby-terminals** widget — diversion berths within 60 km (no Overpass dependency). | NGA World Port Index (Pub 150) | ANNUAL |
+| **Trade & macro context** | Top-N countries by trade % of GDP, container throughput (TEU) and Logistics Performance Index — ranked horizontal bar charts, aggregate regions excluded, real countries only. | World Bank Open Data (mrnev=1) | ANNUAL |
+| **Live operational** | Marine conditions (wave/swell/wind/visibility), earthquakes, geological events, FX reference rates, port holidays — under a visible provider-budget guard with SWR cache + circuit breakers. | Open-Meteo, USGS, NASA EONET, Frankfurter/ECB, Nager.Date | LIVE / DAILY |
+| **Compliance rule engine** | Configurable, versioned-per-tenant rules → per-row pass/warn/fail/no-data with reason codes; bulk CSV (5,000 rows); data-gap + owner-coverage reports. | rule library | ESTIMATE |
+| **Provenance & honesty** | Data-class badge on every number (LIVE/DAILY/ANNUAL/ESTIMATE/SAMPLE/UNAVAILABLE), source + age, eight honesty rules baked into the UI. | — | — |
+
+Eight dashboards surface the above — **executive, compliance, weather, chokepoints,
+trade, cost, vessel, health** — each widget carries its own provenance badge, and
+every free-tier gap is shown as an honest `UNAVAILABLE` with a reason, never a
+fabricated figure.
+
 ## Improvements added beyond the original prompt
 
 - **Self-verifying build**: ISO 6346 golden tests run on every page load and on

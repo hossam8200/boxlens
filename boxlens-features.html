@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="BoxLens — Container Compliance & Port Intelligence. A tour of the platform's real-data capabilities: ISO 6346 validation, VGM, NGA World Port Index, World Bank trade macro, live operational feeds, and a honesty-first provenance model.">
+<title>BoxLens — Features &amp; Capabilities</title>
+<style>
+  /* ---------- Design tokens ---------- */
+  :root{
+    --navy-900:#050b18;
+    --navy-800:#0a1628;
+    --navy-700:#102136;
+    --navy-600:#16304f;
+    --teal:#0f766e;
+    --cyan:#0891b2;
+    --blue:#2563eb;
+    --amber:#d97706;
+    --violet:#7c3aed;
+    --ink:#e6edf7;
+    --ink-dim:#9fb0cc;
+    --ink-faint:#6b7f9e;
+    --glass:rgba(10,22,40,.55);
+    --glass-brd:rgba(148,179,230,.18);
+    --glow:0 0 40px rgba(8,145,178,.35);
+    --snap-h:100vh;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--navy-900);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;scroll-behavior:smooth}
+  img{display:block;max-width:100%;height:auto}
+  a{color:inherit;text-decoration:none}
+
+  /* ---------- Scroll-snap deck ---------- */
+  .deck{height:100vh;overflow-y:scroll;scroll-snap-type:y mandatory;
+    scrollbar-width:none;-ms-overflow-style:none}
+  .deck::-webkit-scrollbar{display:none}
+  .slide{position:relative;min-height:var(--snap-h);width:100%;scroll-snap-align:start;
+    scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;padding:clamp(1rem,4vw,3rem);isolation:isolate}
+  .slide .bg{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:center;
+    transform:scale(1.08);transition:transform 6s ease-out;filter:saturate(1.05)}
+  .slide.in .bg{transform:scale(1)}
+  .slide .scrim{position:absolute;inset:0;z-index:-1;
+    background:
+      radial-gradient(120% 90% at 80% 10%,rgba(8,145,178,.18),transparent 60%),
+      linear-gradient(120deg,rgba(5,11,24,.92) 0%,rgba(10,22,40,.78) 40%,rgba(10,22,40,.55) 100%)}
+  .slide.right .scrim{background:
+      radial-gradient(120% 90% at 20% 10%,rgba(124,58,237,.18),transparent 60%),
+      linear-gradient(260deg,rgba(5,11,24,.92) 0%,rgba(10,22,40,.78) 40%,rgba(10,22,40,.55) 100%)}
+
+  /* ---------- Layout ---------- */
+  .wrap{width:100%;max-width:1180px;margin:0 auto}
+  .eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:clamp(.72rem,1.4vw,.85rem);
+    font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--cyan);
+    padding:.4rem .8rem;border:1px solid rgba(8,145,178,.4);border-radius:999px;
+    background:rgba(8,145,178,.08);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:var(--glow)}
+  h1.title{font-size:clamp(2.2rem,7vw,4.6rem);line-height:1.02;margin:.6rem 0 0;font-weight:800;
+    letter-spacing:-.02em;background:linear-gradient(120deg,#fff,#9fd4ff 60%,#7dd3fc);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  h2.title{font-size:clamp(1.9rem,5.5vw,3.4rem);line-height:1.05;margin:.5rem 0 0;font-weight:800;
+    letter-spacing:-.02em;background:linear-gradient(120deg,#fff,#bfe3ff 70%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  p.lead{font-size:clamp(1rem,1.9vw,1.22rem);line-height:1.6;color:var(--ink-dim);max-width:54ch;margin:1rem 0 0}
+  .kicker{font-size:clamp(2.4rem,7vw,4rem);font-weight:800;line-height:1;color:transparent;
+    background:linear-gradient(120deg,var(--cyan),var(--blue));-webkit-background-clip:text;background-clip:text}
+
+  /* ---------- Glass cards ---------- */
+  .glass{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    box-shadow:0 18px 60px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06)}
+  .card{padding:clamp(1.1rem,2.4vw,1.8rem)}
+  .grid{display:grid;gap:clamp(.7rem,1.6vw,1.1rem)}
+  .grid.g3{grid-template-columns:repeat(3,1fr)}
+  .grid.g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:780px){.grid.g3,.grid.g2{grid-template-columns:1fr}}
+
+  .feature{transition:transform .35s ease,box-shadow .35s ease,border-color .35s ease}
+  .feature:hover{transform:translateY(-4px);border-color:rgba(8,145,178,.5);
+    box-shadow:0 22px 70px rgba(0,0,0,.55),0 0 30px rgba(8,145,178,.25)}
+  .feature .ico{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;margin-bottom:.7rem;
+    font-size:1.25rem;background:linear-gradient(135deg,rgba(8,145,178,.25),rgba(37,99,235,.2));
+    border:1px solid rgba(8,145,178,.35)}
+  .feature h3{margin:.2rem 0 .35rem;font-size:clamp(1.02rem,2vw,1.18rem);font-weight:700;color:#fff}
+  .feature p{margin:0;font-size:clamp(.85rem,1.5vw,.98rem);line-height:1.5;color:var(--ink-dim)}
+
+  /* ---------- Stat band ---------- */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:clamp(.6rem,1.6vw,1rem)}
+  .stat{padding:.9rem .8rem;border-radius:14px;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.08)}
+  .stat .num{font-size:clamp(1.5rem,4vw,2.4rem);font-weight:800;line-height:1;
+    background:linear-gradient(120deg,#fff,#7dd3fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .lbl{margin-top:.3rem;font-size:clamp(.7rem,1.3vw,.8rem);color:var(--ink-faint);
+    text-transform:uppercase;letter-spacing:.08em}
+
+  /* ---------- Badge row ---------- */
+  .badges{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+  .badge{font-size:.78rem;font-weight:600;padding:.35rem .7rem;border-radius:999px;
+    border:1px solid rgba(148,179,230,.25);background:rgba(255,255,255,.04);color:var(--ink-dim)}
+  .badge .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:.4rem;vertical-align:middle}
+  .b-live .dot{background:#16a34a}.b-daily .dot{background:#2563eb}.b-annual .dot{background:#7c3aed}
+  .b-sample .dot{background:#64748b}.b-unavailable .dot{background:#dc2626}
+
+  /* ---------- Hero ---------- */
+  .hero .wrap{display:grid;gap:clamp(1.2rem,3vw,2.4rem)}
+  .hero .mark{display:flex;align-items:center;gap:.7rem;font-weight:800;letter-spacing:.04em;
+    font-size:clamp(1rem,2.4vw,1.3rem)}
+  .hero .mark .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--teal),var(--blue));box-shadow:var(--glow);font-size:1.1rem}
+  .hero .cta-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.2rem}
+  .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.8rem 1.3rem;border-radius:11px;
+    font-weight:700;font-size:clamp(.9rem,1.7vw,1rem);transition:transform .25s,box-shadow .25s}
+  .btn-primary{background:linear-gradient(135deg,var(--teal),var(--cyan));color:#fff;
+    box-shadow:0 12px 30px rgba(8,145,178,.4)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(8,145,178,.55)}
+  .btn-ghost{border:1px solid var(--glass-brd);color:var(--ink);background:var(--glass)}
+  .btn-ghost:hover{border-color:rgba(8,145,178,.5)}
+
+  /* two-column body */
+  .split{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(1rem,3vw,2.4rem);align-items:center}
+  @media(max-width:880px){.split{grid-template-columns:1fr}}
+
+  /* ---------- Chrome / nav ---------- */
+  .topbar{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;padding:.7rem clamp(1rem,3vw,2rem);
+    background:linear-gradient(180deg,rgba(5,11,24,.85),rgba(5,11,24,0));
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .topbar .brand{display:flex;align-items:center;gap:.55rem;font-weight:800;font-size:clamp(.95rem,2vw,1.1rem)}
+  .topbar .brand .logo{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--teal),var(--blue));font-size:.95rem}
+  .topbar .crumb{font-size:clamp(.72rem,1.5vw,.85rem);color:var(--ink-faint);letter-spacing:.12em;text-transform:uppercase}
+  .progress{position:fixed;top:0;left:0;height:3px;width:100%;z-index:60;background:transparent}
+  .progress > i{display:block;height:100%;width:0;
+    background:linear-gradient(90deg,var(--teal),var(--cyan),var(--blue));box-shadow:var(--glow);transition:width .1s linear}
+  .dots{position:fixed;right:clamp(.6rem,2vw,1.4rem);top:50%;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:.6rem}
+  .dots a{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.22);transition:all .3s;display:block}
+  .dots a.active{background:var(--cyan);box-shadow:var(--glow);transform:scale(1.4)}
+  @media(max-width:640px){.dots{display:none}}
+
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+  .reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}.reveal.d3{transition-delay:.24s}
+  .reveal.d4{transition-delay:.32s}
+
+  .footnote{margin-top:1rem;font-size:clamp(.72rem,1.3vw,.82rem);color:var(--ink-faint)}
+  .footnote a{color:var(--cyan);text-decoration:underline;text-underline-offset:2px}
+  ul.tick{list-style:none;padding:0;margin:.9rem 0 0;display:grid;gap:.5rem}
+  ul.tick li{position:relative;padding-left:1.6rem;font-size:clamp(.9rem,1.6vw,1.04rem);color:var(--ink-dim);line-height:1.5}
+  ul.tick li::before{content:"";position:absolute;left:0;top:.45rem;width:14px;height:8px;border-left:2px solid var(--cyan);border-bottom:2px solid var(--cyan);transform:rotate(-45deg)}
+  strong{color:#fff;font-weight:700}
+
+  /* ---------- Section number ---------- */
+  .secno{position:absolute;top:clamp(3.6rem,8vw,5rem);left:clamp(1rem,4vw,3rem);font-weight:800;
+    font-size:clamp(.8rem,1.6vw,1rem);color:var(--ink-faint);letter-spacing:.2em;z-index:1}
+  .secno b{color:var(--cyan)}
+
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .slide .bg{transition:none;transform:none}
+    .reveal{transition:none;opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="progress"><i id="bar"></i></div>
+<header class="topbar">
+  <div class="brand"><span class="logo">◐</span> BoxLens</div>
+  <div class="crumb">Features &amp; Capabilities</div>
+</header>
+<nav class="dots" id="dots" aria-label="Slide navigation"></nav>
+
+<main class="deck" id="deck">
+
+  <!-- 1 · HERO -->
+  <section class="slide hero" id="s1" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/14551fce36e1.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>01</b> / 08</span>
+    <div class="wrap">
+      <div class="mark"><span class="logo">◐</span> BoxLens</div>
+      <span class="eyebrow reveal d1">Container Compliance &amp; Port Intelligence</span>
+      <h1 class="title reveal d2">Every container number,<br>verified against the real world.</h1>
+      <p class="lead reveal d3">ISO 6346 check-digit validation, BIC owner &amp; BoxTech technical data, VGM Method&nbsp;2, the NGA World Port Index, World Bank trade macro, and live marine / seismic / FX feeds — wrapped in a provenance model that never fakes a number.</p>
+      <div class="cta-row reveal d4">
+        <a class="btn btn-primary" href="https://boxlens.vercel.app">Open the platform →</a>
+        <a class="btn btn-ghost" href="#s2">Take the tour ↓</a>
+      </div>
+      <div class="stats glass card reveal d4" style="margin-top:1.4rem">
+        <div class="stat"><div class="num" data-count="5410">0</div><div class="lbl">WPI ports indexed</div></div>
+        <div class="stat"><div class="num" data-count="8">0</div><div class="lbl">Live dashboards</div></div>
+        <div class="stat"><div class="num" data-count="151">0</div><div class="lbl">Automated tests</div></div>
+        <div class="stat"><div class="num" data-count="6">0</div><div class="lbl">Real data sources</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · CONTAINER COMPLIANCE -->
+  <section class="slide" id="s2" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/c072915aadf4.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>02</b> / 08</span>
+    <div class="wrap split">
+      <div>
+        <span class="eyebrow reveal">Container compliance</span>
+        <h2 class="title reveal d1">The ISO 6346 check-digit,<br>done properly.</h2>
+        <p class="lead reveal d2">Every container number is validated against the real ISO 6346 algorithm — the self-verifying golden test runs on every page load, anchored to the Wikipedia CSQU3054383 worked example, so a regression is visible immediately.</p>
+        <ul class="tick reveal d3">
+          <li><strong>BIC Codes</strong> owner lookup with provenance badges</li>
+          <li><strong>BIC BoxTech</strong> technical &amp; safety dimensions</li>
+          <li>Manual-entry path stored as <em>unverified</em>, never mixed with source data</li>
+        </ul>
+        <div class="badges reveal d4">
+          <span class="badge b-live"><span class="dot"></span>LIVE — BIC registry</span>
+          <span class="badge b-annual"><span class="dot"></span>ANNUAL — ISO 6346 spec</span>
+        </div>
+      </div>
+      <div class="glass card reveal d2 grid g2" style="grid-template-columns:1fr">
+        <div class="feature glass card">
+          <div class="ico">#</div>
+          <h3>Check-digit, re-computed</h3>
+          <p>The 11-character owner code + 6-digit serial is validated by recomputing the ISO check digit — not a lookup table.</p>
+        </div>
+        <div class="feature glass card">
+          <div class="ico">▣</div>
+          <h3>Owner &amp; dimensions</h3>
+          <p>BIC Codes resolves the operator; BIC BoxTech adds tare, max payload, door sizes and stacking limits.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · VGM -->
+  <section class="slide right" id="s3" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/89cf2ae82e98.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>03</b> / 08</span>
+    <div class="wrap split">
+      <div class="glass card reveal d1 grid g2" style="grid-template-columns:1fr">
+        <div class="feature glass card">
+          <div class="ico">⚖</div>
+          <h3>Method 2 assistant</h3>
+          <p>Sums tare + cargo per item, warns on overweight / payload limits, and prints a <strong>DRAFT</strong> declaration sheet — never certified, never silent.</p>
+        </div>
+        <div class="feature glass card">
+          <div class="ico">✎</div>
+          <h3>Smart search &amp; anatomy</h3>
+          <p>Tabbed shell, ISO 6346 anatomy diagram, check-digit live fix, and a route estimator between major ports.</p>
+        </div>
+      </div>
+      <div>
+        <span class="eyebrow reveal">Verified gross mass</span>
+        <h2 class="title reveal d2">VGM Method&nbsp;2,<br>without the paperwork panic.</h2>
+        <p class="lead reveal d3">SOLAS VGM compliance for shippers who weigh each item rather than the whole packed container. The assistant does the arithmetic, flags the limits, and stamps the output <strong>DRAFT — NOT CERTIFIED</strong> so it can never be mistaken for a weighing.</p>
+        <div class="stats reveal d4" style="margin-top:1.2rem">
+          <div class="stat"><div class="num" data-count="16">0</div><div class="lbl">Curated ports</div></div>
+          <div class="stat"><div class="num">∞</div><div class="lbl">Bulk validation</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · PORT INTELLIGENCE -->
+  <section class="slide" id="s4" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/2d12d394c5a6.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>04</b> / 08</span>
+    <div class="wrap split">
+      <div>
+        <span class="eyebrow reveal">Port intelligence</span>
+        <h2 class="title reveal d1">5,410 ports,<br>every physical characteristic.</h2>
+        <p class="lead reveal d2">The NGA World Port Index (Pub&nbsp;150) powers real port matching by great-circle distance — channel depth, cargo pier depth, anchorage, tidal range, harbor size, max vessel, and entrance restrictions (swell / ice / tide).</p>
+        <ul class="tick reveal d3">
+          <li><strong>Nearby terminals</strong> widget — diversion &amp; alternative berths within 60&nbsp;km, no Overpass dependency</li>
+          <li><strong>Port characteristics</strong> — full WPI detail for the representative port</li>
+          <li>UN/LOCODE registry fused with WPI depth soundings</li>
+        </ul>
+        <div class="badges reveal d4">
+          <span class="badge b-annual"><span class="dot"></span>ANNUAL — NGA Pub 150 (2019 ed.)</span>
+          <span class="badge">great-circle distance</span>
+        </div>
+      </div>
+      <div class="glass card reveal d2">
+        <div class="stats">
+          <div class="stat"><div class="num" data-count="5410">0</div><div class="lbl">Ports indexed</div></div>
+          <div class="stat"><div class="num" data-count="60">0</div><div class="lbl">km radius</div></div>
+          <div class="stat"><div class="num">9</div><div class="lbl">Fields / port</div></div>
+        </div>
+        <p class="footnote">Source: NGA Publication 150, World Port Index, via the tayljordan/ports public mirror. Port particulars are not comprehensive and may change — verify against current NGA / port-authority notices before any navigation decision.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · TRADE & MACRO -->
+  <section class="slide right" id="s5" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d5ccd70db2fe.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>05</b> / 08</span>
+    <div class="wrap split">
+      <div class="glass card reveal d1 grid g2" style="grid-template-columns:1fr">
+        <div class="feature glass card">
+          <div class="ico">↗</div>
+          <h3>Trade % of GDP</h3>
+          <p>Top countries by trade openness — Hong&nbsp;Kong, Luxembourg, Singapore lead the ranked bar chart.</p>
+        </div>
+        <div class="feature glass card">
+          <div class="ico">▤</div>
+          <h3>Container throughput (TEU)</h3>
+          <p>China, USA, Singapore — the real national TEU volumes from World Bank Open Data.</p>
+        </div>
+        <div class="feature glass card">
+          <div class="ico">★</div>
+          <h3>Logistics Performance Index</h3>
+          <p>Top-20 LPI scores — Singapore, Finland, Denmark — as a horizontal bar chart.</p>
+        </div>
+      </div>
+      <div>
+        <span class="eyebrow reveal">Trade &amp; macro context</span>
+        <h2 class="title reveal d2">World Bank Open Data,<br>ranked, not raw.</h2>
+        <p class="lead reveal d3">Three annual indicators — trade as % of GDP, container port throughput (TEU), and the Logistics Performance Index — fetched with <strong>mrnev=1</strong> (most recent non-empty value per country), filtered to real countries (aggregate regions excluded), and ranked descending into Top-N bar charts.</p>
+        <div class="badges reveal d4">
+          <span class="badge b-annual"><span class="dot"></span>ANNUAL — World Bank Open Data</span>
+          <span class="badge">≈160 countries covered</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · LIVE OPERATIONAL -->
+  <section class="slide" id="s6" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/4702237846ff.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>06</b> / 08</span>
+    <div class="wrap">
+      <span class="eyebrow reveal">Live operational data</span>
+      <h2 class="title reveal d1">Six real feeds, one budget guard.</h2>
+      <p class="lead reveal d2" style="max-width:70ch">Marine conditions, seismic risk, geopolitical events, and FX reference rates — all real, all rate-limited by a visible provider-budget guard so the free tier stays fair-use forever.</p>
+      <div class="grid g3 reveal d3" style="margin-top:1.4rem">
+        <div class="feature glass card"><div class="ico">~</div><h3>Open-Meteo Marine</h3><p>Wave height, swell, wind, visibility per port — drives the go/no-go operational condition.</p></div>
+        <div class="feature glass card"><div class="ico">◉</div><h3>USGS Earthquakes</h3><p>Live quake magnitude &amp; depth near chokepoints — tsunami / berth risk context.</p></div>
+        <div class="feature glass card"><div class="ico">⚠</div><h3>NASA EONET</h3><p>Geological &amp; storm events along sea lanes — transit-impact alerts.</p></div>
+        <div class="feature glass card"><div class="ico">€</div><h3>Frankfurter (ECB)</h3><p>Daily USD/EUR/GBP/CNY/JPY/AED/SGD reference rates — landed-cost context.</p></div>
+        <div class="feature glass card"><div class="ico">☼</div><h3>Nager.Date</h3><p>Public holidays per port country — gate-closure planning.</p></div>
+        <div class="feature glass card"><div class="ico">⏱</div><h3>SWR + circuit breaker</h3><p>Stale-while-revalidate cache + per-provider breaker — graceful under outages.</p></div>
+      </div>
+      <div class="badges reveal d4">
+        <span class="badge b-live"><span class="dot"></span>LIVE</span>
+        <span class="badge b-daily"><span class="dot"></span>DAILY</span>
+        <span class="badge b-annual"><span class="dot"></span>ANNUAL</span>
+        <span class="badge b-sample"><span class="dot"></span>SAMPLE (labelled)</span>
+        <span class="badge b-unavailable"><span class="dot"></span>UNAVAILABLE (honest)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · COMPLIANCE RULE ENGINE -->
+  <section class="slide right" id="s7" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/679799440846.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>07</b> / 08</span>
+    <div class="wrap split">
+      <div>
+        <span class="eyebrow reveal">Compliance rule engine</span>
+        <h2 class="title reveal d1">Rules are data,<br>not hard-coded.</h2>
+        <p class="lead reveal d2">A configurable rule engine — rules versioned per tenant — produces per-row pass / warning / fail / no-data with reason codes. Bulk-validate bookings via CSV paste (or generate 5,000 sample rows), then export the data-gap report by owner or country.</p>
+        <ul class="tick reveal d3">
+          <li>Per-row verdicts with structured reason codes</li>
+          <li>Owner-coverage trend + data-gap report (CSV export)</li>
+          <li>Saved shipments &amp; watchlists (localStorage) with channel alerts</li>
+        </ul>
+      </div>
+      <div class="glass card reveal d2">
+        <div class="stats">
+          <div class="stat"><div class="num" data-count="5000">0</div><div class="lbl">Rows / bulk run</div></div>
+          <div class="stat"><div class="num">4</div><div class="lbl">Verdict states</div></div>
+          <div class="stat"><div class="num">∞</div><div class="lbl">Versioned rules</div></div>
+        </div>
+        <p class="footnote" style="margin-top:.9rem">Every verdict carries its data-class + source + age, so a <em>no-data</em> is never dressed up as a pass.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · HONESTY / CLOSING -->
+  <section class="slide" id="s8" data-img="https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/a61764e6bdb3.jpg">
+    <div class="bg"></div><div class="scrim"></div>
+    <span class="secno"><b>08</b> / 08</span>
+    <div class="wrap" style="text-align:center;max-width:760px">
+      <span class="eyebrow reveal" style="margin:0 auto">Honesty-first, end to end</span>
+      <h2 class="title reveal d1" style="margin:.6rem auto 0">No fake numbers.<br>Ever.</h2>
+      <p class="lead reveal d2" style="margin:.9rem auto 0">Eight honesty rules are baked into the UI — the disclaimer strip, the VGM <strong>DRAFT — NOT CERTIFIED</strong> stamp, the arrivals "AIS shows vessels, not containers" rule, and provenance badges on every single number. When a free-tier source is missing, the widget says <em>UNAVAILABLE</em> and explains why — it never invents a figure to look complete.</p>
+      <div class="cta-row reveal d3" style="justify-content:center;margin-top:1.4rem">
+        <a class="btn btn-primary" href="https://boxlens.vercel.app">Open BoxLens →</a>
+        <a class="btn btn-ghost" href="https://github.com/hossam8200/boxlens">Source on GitHub</a>
+      </div>
+      <p class="footnote reveal d4" style="margin-top:1.6rem">Imagery: real container terminals, yards &amp; cranes via web image search. BoxLens is a demonstration platform — verify all operational data against current authority notices before use.</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  var deck=document.getElementById('deck');
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  // load background images
+  slides.forEach(function(s){
+    var url=s.getAttribute('data-img'); if(!url) return;
+    var bg=s.querySelector('.bg'); bg.style.backgroundImage='url("'+url+'")';
+  });
+  // build dots
+  var dots=document.getElementById('dots');
+  slides.forEach(function(s,i){
+    var a=document.createElement('a'); a.href='#'+s.id; a.setAttribute('aria-label','Slide '+(i+1));
+    a.addEventListener('click',function(e){e.preventDefault(); s.scrollIntoView({behavior:'smooth'});});
+    dots.appendChild(a);
+  });
+  var dotEls=[].slice.call(dots.children);
+
+  // progress bar
+  var bar=document.getElementById('bar');
+  function onScroll(){
+    var max=deck.scrollHeight-deck.clientHeight;
+    var p=max>0?(deck.scrollTop/max)*100:0;
+    bar.style.width=p+'%';
+  }
+  deck.addEventListener('scroll',onScroll,{passive:true});
+
+  // IntersectionObserver: reveal + active dot + counters
+  var counted={};
+  function countUp(el){
+    if(counted[el])return; counted[el]=true;
+    var target=parseInt(el.getAttribute('data-count'),10); if(isNaN(target))return;
+    var start=0,dur=1200,t0=null;
+    function step(t){ if(!t0)t0=t; var k=Math.min((t-t0)/dur,1);
+      var eased=1-Math.pow(1-k,3); el.textContent=Math.round(target*eased).toLocaleString();
+      if(k<1)requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  }
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if(en.isIntersecting){
+        en.target.classList.add('in');
+        var idx=slides.indexOf(en.target);
+        dotEls.forEach(function(d,i){d.classList.toggle('active',i===idx);});
+        en.target.querySelectorAll('.reveal').forEach(function(r){r.classList.add('in');});
+        en.target.querySelectorAll('[data-count]').forEach(countUp);
+      }
+    });
+  },{root:deck,threshold:0.4});
+  slides.forEach(function(s){io.observe(s);});
+  onScroll();
+})();
+</script>
+</body>
+</html>

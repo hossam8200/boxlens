@@ -106,14 +106,17 @@ describe('resolveWidget — executive (real operational conditions)', () => {
     expect((p.rows ?? []).length).toBeGreaterThan(0);
   });
 
-  it('nearby-terminals degrades to UNAVAILABLE when OSM has no mapped facilities (graceful)', async () => {
-    // The global fetch stub returns the Open-Meteo body for every call, so the
-    // Overpass response has no `elements` array -> the widget must return a
-    // clean UNAVAILABLE (0 facilities) payload, never throw.
+  it('nearby-terminals resolves from the NGA World Port Index (real data, no Overpass)', async () => {
+    // Overpass is unreachable from shared cloud egress IPs, so the widget now
+    // sources nearby facilities from the local NGA WPI fixture — it always
+    // resolves with real rows for the default representative port (Rotterdam),
+    // never throws and never returns UNAVAILABLE.
     const p = await resolveWidget('executive', 'nearby-terminals');
-    expect(p.provenance.source).toMatch(/OpenStreetMap/);
-    expect(p.provenance.class).toBe('UNAVAILABLE');
-    expect(p.value).toBe(0);
+    expect(p.provenance.source).toMatch(/World Port Index/);
+    expect(p.provenance.class).toBe('ANNUAL');
+    expect(typeof p.value).toBe('number');
+    expect(p.value as number).toBeGreaterThan(0);
+    expect((p.rows ?? []).length).toBeGreaterThan(0);
   });
 
   it('sea-route showcase returns an ESTIMATE table of major lanes with real distances', async () => {
@@ -263,7 +266,7 @@ describe('data confirmation — real widgets carry real data (value + rows)', ()
 });
 
 describe('resolveWidget — trade (World Bank Top-N, real countries only)', () => {
-  it('excludes aggregate regions, ranks descending, headline = top country value', async () => {
+  it('excludes aggregate regions, ranks descending, headline = count of real countries', async () => {
     const p = await resolveWidget('trade', 'trade-gdp-pct');
     expect(p.provenance.class).toBe('ANNUAL');
     const rows = p.rows ?? [];
@@ -273,8 +276,8 @@ describe('resolveWidget — trade (World Bank Top-N, real countries only)', () =
     expect(rows[0]!.Country).toBe('Singapore');
     expect(rows[0]!.Value).toBe(320.5);
     expect(rows[rows.length - 1]!.Country).toBe('United States');
-    // headline value is the top country's value, not a row count.
-    expect(p.value).toBe(320.5);
+    // headline value is the count of real countries covered (aggregates excluded).
+    expect(p.value).toBe(4);
     // no aggregate region names leaked through.
     const names = rows.map((r) => String(r.Country)).join('|');
     expect(names).not.toContain('Africa Eastern');
@@ -293,5 +296,27 @@ describe('resolveWidget — trade (World Bank Top-N, real countries only)', () =
       expect(r.ISO3).not.toBe('AFE');
       expect(r.ISO3).not.toBe('WLD');
     }
+  });
+});
+
+describe('resolveWidget — executive nearby-terminals (NGA WPI, real data)', () => {
+  it('returns real nearby facilities from the World Port Index, not UNAVAILABLE Overpass', async () => {
+    const p = await resolveWidget('executive', 'nearby-terminals');
+    // The WPI is a local fixture (no network), so for the default representative
+    // port (Rotterdam) this always resolves with data — never UNAVAILABLE.
+    expect(p.provenance.class).toBe('ANNUAL');
+    expect(p.provenance.source).toContain('World Port Index');
+    expect(p.provenance.attribution).toContain('NGA');
+    const rows = p.rows ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    // every row is a real facility with a country + a great-circle distance.
+    for (const r of rows) {
+      expect(typeof r.Facility).toBe('string');
+      expect(String(r.Distance)).toMatch(/km$/);
+      expect(typeof r.Country).toBe('string');
+    }
+    // the scoped port itself is dropped when it is the nearest match (< 2 km),
+    // so the first row is a DIFFERENT nearby facility at a non-zero distance.
+    expect(rows[0]!.Facility).not.toBe('Rotterdam');
   });
 });
