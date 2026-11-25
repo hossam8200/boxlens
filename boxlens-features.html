@@ -422,9 +422,9 @@
   deck.addEventListener('scroll',onScroll,{passive:true});
 
   // IntersectionObserver: reveal + active dot + counters
-  var counted={};
+  var counted=new WeakSet();
   function countUp(el){
-    if(counted[el])return; counted[el]=true;
+    if(counted.has(el))return; counted.add(el);
     var target=parseInt(el.getAttribute('data-count'),10); if(isNaN(target))return;
     var start=0,dur=1200,t0=null;
     function step(t){ if(!t0)t0=t; var k=Math.min((t-t0)/dur,1);
