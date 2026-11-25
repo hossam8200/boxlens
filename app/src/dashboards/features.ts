@@ -23,6 +23,7 @@ const SOURCES: ReadonlyArray<SourceInfo> = [
   { name: 'Frankfurter (ECB FX)', cls: 'DAILY', badgeCls: 'dc-daily', limit: '1,000/day', note: 'ECB reference exchange rates. Keyless.' },
   { name: 'Nager.Date', cls: 'DAILY', badgeCls: 'dc-daily', limit: '1,000/day', note: 'Public holidays per country. Keyless.' },
   { name: 'World Bank', cls: 'ANNUAL', badgeCls: 'dc-annual', limit: '4,000/day', note: 'Trade % GDP, port throughput, LPI. Keyless.' },
+  { name: 'NGA World Port Index', cls: 'ANNUAL', badgeCls: 'dc-annual', limit: 'embedded', note: 'Pub 150: 5,410 ports — depth, harbor size, max vessel, tidal range. Embedded fixture.' },
   { name: 'aisstream.io', cls: 'UNAVAILABLE', badgeCls: 'dc-unavailable', limit: '200/day', note: 'Live AIS positions. Needs API key + cron.' },
 ];
 
@@ -41,6 +42,7 @@ const TOOLS: ReadonlyArray<ToolInfo> = [
   { icon: '🏷️', name: 'BIC owner lookup', badge: 'PARTIAL', badgeCls: 'dc-sample', body: 'Resolve a 4-letter owner code to its shipping line (curated subset of the public BIC BoxTech register). Production wires the live BIC Codes API with per-prefix IndexedDB caching.' },
   { icon: '🗺️', name: 'Port & country filter', badge: 'LIVE', badgeCls: 'dc-daily', body: 'Full UN/LOCODE sea-port search with a cascading country \u2192 port filter — selecting a country narrows the port list to that country only.' },
   { icon: '🧭', name: 'Sea route & rough ETA', badge: 'ESTIMATE', badgeCls: 'dc-estimate', body: 'Chokepoint-aware great-circle estimate between two ports: the direct arc is tested against a coarse landmass mask and rerouted via Suez / Panama / Cape of Good Hope / Cape Horn when it would cross a continent. Distance × detour factor, ETA from an explicit assumed speed. Pure offline — verify against the carrier schedule.' },
+  { icon: '⚓', name: 'Port characteristics (NGA Pub 150)', badge: 'ANNUAL', badgeCls: 'dc-annual', body: 'Real physical characteristics for every port in scope — channel / cargo-pier / anchorage depth, tidal range, harbor size, max vessel size and entrance restrictions (swell, ice, tide) — from NGA Publication 150 (5,410 ports), matched to each port by nearest coordinate. Embedded fixture, no API key. Verify against current Pub 150 / port notices before navigation.' },
   { icon: '🔁', name: 'Honest degradation', badge: 'RULE', badgeCls: 'dc-daily', body: 'Every value keeps a provenance badge (source, fetched-at, status). AIS shows vessels not containers; ETAs are estimates with method and age; missing means missing — never fabricated.' },
 ];
 
@@ -71,10 +73,10 @@ export function renderFeatures(root: HTMLElement, onSelect: (id: DashboardId) =>
   // ---- Hero ----
   const hero = el('div', { class: 'glass feat-hero' });
   hero.innerHTML =
-    '<div class="feat-hero-eyebrow">BoxLens · v2.5</div>' +
+    '<div class="feat-hero-eyebrow">BoxLens · v2.6</div>' +
     '<h1>Features &amp; Capabilities</h1>' +
     '<p class="muted">A single application for container-compliance and port intelligence — nine dashboards, ' +
-    'six keyless data sources, an ISO 6346 + size/type + VGM Method 2 toolset, honest data-class labelling, ' +
+    'seven data sources (six keyless APIs + the embedded NGA World Port Index), an ISO 6346 + size/type + VGM Method 2 toolset, honest data-class labelling, ' +
     'and a $0 recurring-cost platform. Everything below is reachable from this one URL.</p>';
   root.appendChild(hero);
 
@@ -113,7 +115,7 @@ export function renderFeatures(root: HTMLElement, onSelect: (id: DashboardId) =>
   root.appendChild(dleg);
 
   // ---- Data sources ----
-  root.appendChild(sectionHead('Data sources', 'Six keyless public providers power the live and daily widgets — no paid API keys needed.'));
+  root.appendChild(sectionHead('Data sources', 'Six keyless public APIs plus the embedded NGA World Port Index (5,410 ports) power the live, daily and annual widgets — no paid API keys needed.'));
   const sgrid = el('div', { class: 'feat-source-grid' });
   for (const s of SOURCES) {
     const card = el('div', { class: 'glass feat-source' });

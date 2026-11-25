@@ -119,6 +119,7 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   const portRows = (byId.get('active-ports')?.rows ?? []) as Array<{
     Lat: number; Lng: number; Port: string; Country: string;
     Wind: number; Wave: number; Class: string; Score: number;
+    Depth: string; Harbor: string; MaxVessel: string;
   }>;
   try {
     const points = portRows.map((r) => {
@@ -151,12 +152,32 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
         Country: r.Country,
         Wind: `${r.Wind} kt`,
         Wave: `${r.Wave} m`,
+        Depth: r.Depth,
+        Harbor: r.Harbor,
+        MaxVessel: r.MaxVessel,
         Class: r.Class,
         Score: r.Score,
       })),
       csvName: 'executive-ports.csv',
     }),
   );
+
+  // ---- Port characteristics (NGA Pub 150) ----
+  const charPayload = byId.get('port-characteristics');
+  const charRows = (charPayload?.rows ?? []) as Array<Record<string, string | number | null>>;
+  if (charRows.length) {
+    const grid4 = el('div', { class: 'dash-grid' });
+    const charCellEl = el('div', { class: 'col-12' });
+    grid4.appendChild(charCellEl);
+    root.appendChild(grid4);
+    charCellEl.appendChild(
+      tableCell({
+        title: 'Port characteristics — NGA Pub 150 (representative port in scope)',
+        rows: charRows,
+        csvName: 'executive-port-characteristics.csv',
+      }),
+    );
+  }
 
   // Suppress unused-import warning for kpiCard/drilldownTable (kept for editor
   // jump-to-definition; the shared helpers compose them).

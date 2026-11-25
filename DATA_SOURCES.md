@@ -21,6 +21,7 @@ implementing" rule.
 | Nager.Date | 200, key-less | DAILY | MIT; commercial OK | 1 000/day | 24 h | daily | ✅ wires in slice #3 |
 | Frankfurter (ECB FX) | 200 via `.dev` (`.app` 301→`.dev`) | DAILY | ECB reference rates; free, key-less | 1 000/day | 12 h | daily | ✅ wires in slice #6 |
 | World Bank Open Data | 200, key-less | ANNUAL | Open data; attribution requested | 4 000/day | 7 days | annual | ✅ wires in slice #5 |
+| NGA World Port Index (Pub 150) | embedded fixture (no REST API) | ANNUAL | NGA Pub 150, 2019 ed. (public); verify against current edition | n/a (embedded) | 7 days | static | ✅ port physical characteristics — channel/pier/anchorage depth, tidal range, harbor size, max vessel, entrance restrictions — matched per port by nearest coordinate (≤ 10 km). 5,410 ports indexed (3,587 with depth). Source: `tayljordan/ports` mirror of NGA Pub 150. |
 | NASA EONET | 200, key-less | LIVE | Open; credit NASA EONET | 2 000/day | 1 h | near-real-time | ✅ wires in slice #4 |
 | USGS earthquakes | 200, key-less (GeoJSON) | LIVE | Public domain (USGS) | 2 000/day | 1 h | hourly | ✅ wires in slice #4 |
 | UN/LOCODE | bundled CSV (no REST API) | (reference) | UNECE; open | n/a | static | periodic import | ✅ embedded |

@@ -12,6 +12,7 @@
 import SEAPORTS from '../_data/seaports.json' with { type: 'json' };
 import { getOrFetch } from './cache.js';
 import { fetchOpenMeteoMarine, fetchOpenMeteoDaily7 } from './providers.js';
+import { enrichPort, type PortEnrichment } from './portIndex.js';
 
 type PortTuple = [string, string, string, number | null, number | null];
 const PORTS: readonly PortTuple[] = SEAPORTS as PortTuple[];
@@ -30,6 +31,9 @@ export interface PortCond {
   cls: Cond;
   /** 0-100 operational risk; higher = worse. */
   score: number;
+  /** NGA World Port Index physical characteristics (null when no WPI port
+   * lies within the match radius of this port's coordinates). */
+  enr: PortEnrichment;
 }
 
 export interface ScopeResult {
@@ -166,6 +170,7 @@ export async function getPortConditions(filters: {
   const swr = await getOrFetch(key, 1800, async () => {
     return Promise.all(
       ports.map(async (p): Promise<PortCond> => {
+        const enr = enrichPort(p.lat, p.lng);
         try {
           const r = await fetchOpenMeteoMarine(p.lat, p.lng);
           const cls = classify(r.data.windKnots, r.data.waveM, r.data.visibilityKm);
@@ -180,6 +185,7 @@ export async function getPortConditions(filters: {
             visKm: r.data.visibilityKm,
             cls,
             score: scoreOf(cls, r.data.windKnots, r.data.waveM, r.data.visibilityKm),
+            enr,
           };
         } catch {
           // A single port fetch failing must not blank the whole dashboard.
@@ -194,6 +200,7 @@ export async function getPortConditions(filters: {
             visKm: 10,
             cls: 'pass',
             score: 0,
+            enr,
           };
         }
       }),

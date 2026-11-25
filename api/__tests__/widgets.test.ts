@@ -59,6 +59,19 @@ describe('resolveWidget — executive (real operational conditions)', () => {
     expect(rows[0]).toHaveProperty('Wind');
     expect(rows[0]).toHaveProperty('Wave');
     expect(rows[0]).toHaveProperty('Class');
+    // NGA WPI enrichment columns (Depth / Harbor / MaxVessel) are present on
+    // every row — '—' when no WPI port lies within the match radius.
+    expect(rows[0]).toHaveProperty('Depth');
+    expect(rows[0]).toHaveProperty('Harbor');
+    expect(rows[0]).toHaveProperty('MaxVessel');
+  });
+
+  it('port-characteristics returns NGA Pub 150 detail (ANNUAL) for the representative port', async () => {
+    const p = await resolveWidget('executive', 'port-characteristics');
+    expect(p.provenance.source).toMatch(/NGA World Port Index/);
+    // Global sample[0] = Rotterdam -> WPI match EUROPOORT -> ANNUAL + rows.
+    expect(p.provenance.class).toBe('ANNUAL');
+    expect((p.rows ?? []).length).toBeGreaterThan(0);
   });
 
   it('free-tier-budget is LIVE quota (not weather)', async () => {

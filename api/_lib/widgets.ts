@@ -17,6 +17,7 @@ import {
 } from './providers.js';
 import { healthWidget } from './fixtures.js';
 import { getPortConditions, getPortTrend7, portCount } from './portConditions.js';
+import { nearestWpi, WPI_PORT_COUNT } from './portIndex.js';
 import type { DashboardId, WidgetPayload, Provenance, DataClass } from '../../app/src/dashboards/framework/types.js';
 import type { ProviderLimit } from './quota.js';
 import { PROVIDER_LIMITS, quotaSnapshot } from './quota.js';
@@ -52,6 +53,13 @@ const METHODS = {
     'feed. The proxy flags ports where heavy sea (wave \u2265 2 m) elevates ' +
     'weighbridge-motion risk for VGM Method 2 weighing. Wire a paid VGM/AIS ' +
     'cargo feed for real overweight declarations.',
+  portchars:
+    'NGA Publication 150 (World Port Index, 2019 ed.) physical characteristics ' +
+    'matched to each port by nearest coordinate (\u2264 10 km, preferring a named ' +
+    'port with a recorded depth). ' + WPI_PORT_COUNT +
+    ' ports indexed. Port particulars are not comprehensive and may change ' +
+    'without notice \u2014 verify against current NGA Pub 150 / port authority ' +
+    'notices before any navigation decision.',
 };
 
 /** Resolve a single widget payload, never throwing. */
@@ -179,6 +187,9 @@ async function resolveExecutiveWidget(
         Wind: p.windKnots,
         Wave: p.waveM,
         Vis: p.visKm,
+        Depth: p.enr.depthM != null ? `${p.enr.depthM} m` : '—',
+        Harbor: p.enr.harborSize ?? '—',
+        MaxVessel: p.enr.maxVessel ?? '—',
         Class: p.cls,
         Score: p.score,
       })),
@@ -194,8 +205,55 @@ async function resolveExecutiveWidget(
         Country: p.country,
         Wind: p.windKnots,
         Wave: p.waveM,
+        Depth: p.enr.depthM != null ? `${p.enr.depthM} m` : '—',
+        Harbor: p.enr.harborSize ?? '—',
         Score: p.score,
       })),
+    };
+  }
+  if (widgetId === 'port-characteristics') {
+    // Full NGA Pub 150 physical detail for the representative port in scope.
+    const port = ports[0]!;
+    if (!port) return unavailable(widgetId, 'executive', 'No port in scope.');
+    const m = nearestWpi(port.lat, port.lng, 10);
+    if (!m) {
+      return {
+        value: null,
+        provenance: buildProvenance({
+          source: 'NGA World Port Index (Pub 150)',
+          class: 'UNAVAILABLE',
+          ttl: 604800,
+          method: `No NGA Pub 150 port within 10 km of ${port.name}. The index covers ${WPI_PORT_COUNT} ports; some UN/LOCODE entries (inland depots, small terminals) have no WPI match.`,
+        }),
+      };
+    }
+    const d = (v: number | null) => (v != null ? `${v} m` : '—');
+    return {
+      value: m.depth_m,
+      unit: 'm max depth',
+      provenance: buildProvenance({
+        source: 'NGA World Port Index (Pub 150)',
+        class: 'ANNUAL',
+        ttl: 604800,
+        stale: scope.stale,
+        attribution: 'NGA Publication 150 (2019 ed.)',
+        method: `Nearest WPI match: ${m.name}, ${m.distanceKm} km from ${port.name}. ` + METHODS.portchars,
+      }),
+      rows: [
+        { Field: 'WPI port', Value: m.name },
+        { Field: 'Country', Value: m.country },
+        { Field: 'Max recorded depth', Value: d(m.depth_m) },
+        { Field: 'Channel depth', Value: d(m.channel_depth_m) },
+        { Field: 'Cargo pier depth', Value: d(m.cargo_pier_depth_m) },
+        { Field: 'Anchorage depth', Value: d(m.anchorage_depth_m) },
+        { Field: 'Tidal range', Value: d(m.tidal_range_m) },
+        { Field: 'Harbor size', Value: m.port_size || '—' },
+        { Field: 'Max vessel', Value: m.max_vessel || '—' },
+        { Field: 'Entrance: heavy swell', Value: m.restriction_swell ? 'Restricted' : 'No' },
+        { Field: 'Entrance: ice', Value: m.restriction_ice ? 'Restricted' : 'No' },
+        { Field: 'Entrance: tide', Value: m.restriction_tide ? 'Restricted' : 'No' },
+        { Field: 'Match distance', Value: `${m.distanceKm} km` },
+      ],
     };
   }
   return unavailable(widgetId, 'executive', `Unknown widget "${widgetId}".`);
@@ -280,6 +338,8 @@ async function resolveComplianceWidget(
         Wind: p.windKnots,
         Wave: p.waveM,
         Vis: p.visKm,
+        Depth: p.enr.depthM != null ? `${p.enr.depthM} m` : '—',
+        Harbor: p.enr.harborSize ?? '—',
         Issue:
           p.windKnots >= 34
             ? 'Wind \u2265 34 kt'
@@ -622,6 +682,7 @@ export const WIDGET_IDS_BY_DASHBOARD: Record<DashboardId, string[]> = {
     'free-tier-budget',
     'active-ports',
     'top-failures',
+    'port-characteristics',
   ],
   compliance: ['rule-matrix', 'owner-coverage', 'iso-violations', 'vgm-overweight'],
   weather: ['marine-snapshot', 'risk-score', 'holidays'],

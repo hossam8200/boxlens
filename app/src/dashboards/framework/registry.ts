@@ -87,6 +87,10 @@ registerWidget(
   { id: 'top-failures', title: 'Top 10 operational risks', endpoint: '/api/v1/dashboards/executive/top-failures', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
+registerWidget(
+  { id: 'port-characteristics', title: 'Port characteristics (NGA Pub 150)', endpoint: '/api/v1/dashboards/executive/port-characteristics', refreshSec: 604800, dataClass: 'ANNUAL', cacheTtlSec: 604800, fallback: 'unavailable', export: { csv: true } },
+  'executive',
+);
 
 // 2. Compliance Quality — real operational compliance from Open-Meteo marine
 // conditions per port (DAILY); vgm-overweight is an ESTIMATE proxy (no free
