@@ -12,6 +12,7 @@ import {
   fetchNagerHolidays,
   fetchFrankfurterRates,
   fetchWorldBankIndicator,
+  fetchWorldBankCountries,
   fetchEonetEvents,
   fetchUsgsEarthquakes,
   fetchOverpassNearby,
@@ -634,22 +635,33 @@ const WB_INDICATORS: Record<string, { code: string; name: string; unit: string }
 async function resolveTradeWidget(widgetId: string): Promise<WidgetPayload> {
   const ind = WB_INDICATORS[widgetId];
   if (!ind) return unavailable(widgetId, 'trade', `Unknown widget "${widgetId}".`);
-  const r = await fetchWorldBankIndicator(ind.code);
-  const withValue = r.data.filter((x) => x.value !== null);
+  const [r, countries] = await Promise.all([
+    fetchWorldBankIndicator(ind.code),
+    fetchWorldBankCountries().catch(() => new Set<string>()),
+  ]);
+  // Keep only real countries (exclude WB aggregate regions such as AFE / WLD,
+  // which the country list marks region.id === 'NA') with a non-null most-recent
+  // value, then rank descending for the "Top N countries" tables.
+  const ranked = r.data
+    .filter((x) => x.value !== null && x.iso3.length === 3 && countries.has(x.iso3))
+    .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  const top = ranked[0];
   return {
-    value: withValue.length,
+    value: top ? (top.value as number) : null,
     unit: ind.unit,
     provenance: buildProvenance({
       source: `World Bank — ${ind.name}`,
       class: 'ANNUAL',
       ttl: 604800,
       stale: r.stale,
-      attribution: 'World Bank Open Data',
+      attribution: 'World Bank Open Data (most recent value per country, mrnev=1)',
     }),
-    rows: withValue
-      .filter((x) => x.iso3 && x.iso3.length === 3)
-      .slice(0, 20)
-      .map((x) => ({ Country: x.country, ISO3: x.iso3, Value: x.value ?? '', Year: x.year })),
+    rows: ranked.slice(0, 20).map((x) => ({
+      Country: x.country,
+      ISO3: x.iso3,
+      Value: x.value ?? '',
+      Year: x.year,
+    })),
   };
 }
 

@@ -23,10 +23,42 @@ const OM_BODY = {
   },
 };
 
-const fetchMock = vi.fn(async () => ({
+// World Bank stub payloads — a mix of aggregate regions (AFE, WLD) and real
+// countries (AFG, CHN, USA, SGP). Used to prove the trade resolver excludes
+// aggregates, ranks by value descending, and reports the top country as the
+// headline (not a row count). mrnev=1 means every record has a non-null value.
+const WB_COUNTRIES = [
+  { pages: 1, total: 6 },
+  [
+    { id: 'AFE', region: { id: 'NA' }, name: 'Africa Eastern and Southern' },
+    { id: 'WLD', region: { id: 'NA' }, name: 'World' },
+    { id: 'AFG', region: { id: 'MEA' }, name: 'Afghanistan' },
+    { id: 'CHN', region: { id: 'EAS' }, name: 'China' },
+    { id: 'USA', region: { id: 'NAC' }, name: 'United States' },
+    { id: 'SGP', region: { id: 'EAS' }, name: 'Singapore' },
+  ],
+];
+const WB_INDICATOR = [
+  { pages: 1, total: 6 },
+  [
+    { countryiso3code: 'AFE', country: { value: 'Africa Eastern and Southern' }, value: 51.99, date: '2025' },
+    { countryiso3code: 'WLD', country: { value: 'World' }, value: 100, date: '2024' },
+    { countryiso3code: 'SGP', country: { value: 'Singapore' }, value: 320.5, date: '2024' },
+    { countryiso3code: 'CHN', country: { value: 'China' }, value: 38.2, date: '2024' },
+    { countryiso3code: 'USA', country: { value: 'United States' }, value: 27.3, date: '2024' },
+    { countryiso3code: 'AFG', country: { value: 'Afghanistan' }, value: 55.1, date: '2023' },
+  ],
+];
+
+const fetchMock = vi.fn(async (url: string) => ({
   ok: true,
   status: 200,
-  json: async () => OM_BODY,
+  json: async () => {
+    const u = String(url ?? '');
+    if (u.includes('/indicator/')) return WB_INDICATOR;
+    if (u.includes('worldbank.org')) return WB_COUNTRIES;
+    return OM_BODY;
+  },
 }));
 
 beforeEach(() => {
@@ -227,5 +259,39 @@ describe('data confirmation — real widgets carry real data (value + rows)', ()
     const p = await resolveWidget('chokepoints', 'eonet-events');
     expect(p.provenance.class).toBe('LIVE');
     expect(typeof p.value).toBe('number');
+  });
+});
+
+describe('resolveWidget — trade (World Bank Top-N, real countries only)', () => {
+  it('excludes aggregate regions, ranks descending, headline = top country value', async () => {
+    const p = await resolveWidget('trade', 'trade-gdp-pct');
+    expect(p.provenance.class).toBe('ANNUAL');
+    const rows = p.rows ?? [];
+    // 4 real countries in the stub (AFE + WLD aggregates excluded).
+    expect(rows.length).toBe(4);
+    // sorted descending: Singapore (320.5) first, United States (27.3) last.
+    expect(rows[0]!.Country).toBe('Singapore');
+    expect(rows[0]!.Value).toBe(320.5);
+    expect(rows[rows.length - 1]!.Country).toBe('United States');
+    // headline value is the top country's value, not a row count.
+    expect(p.value).toBe(320.5);
+    // no aggregate region names leaked through.
+    const names = rows.map((r) => String(r.Country)).join('|');
+    expect(names).not.toContain('Africa Eastern');
+    expect(names).not.toContain('World');
+  });
+
+  it('container-throughput + lpi-overall share the same real-country filter + ranking', async () => {
+    const ct = await resolveWidget('trade', 'container-throughput');
+    const lpi = await resolveWidget('trade', 'lpi-overall');
+    expect((ct.rows ?? []).length).toBe(4);
+    expect((lpi.rows ?? []).length).toBe(4);
+    expect(ct.rows![0]!.Country).toBe('Singapore'); // same stub → same ranking
+    expect(lpi.rows![0]!.Country).toBe('Singapore');
+    // no aggregate iso3 codes (AFE/WLD) in either table.
+    for (const r of [...(ct.rows ?? []), ...(lpi.rows ?? [])]) {
+      expect(r.ISO3).not.toBe('AFE');
+      expect(r.ISO3).not.toBe('WLD');
+    }
   });
 });

@@ -197,7 +197,7 @@ export interface WbRow {
 
 export async function fetchWorldBankIndicator(
   indicatorCode: string,
-  perPage = 50,
+  perPage = 1000,
 ): Promise<{ data: WbRow[]; fetchedAt: number; stale: boolean }> {
   const url =
     `https://api.worldbank.org/v2/country/all/indicator/${indicatorCode}` +
@@ -205,17 +205,42 @@ export async function fetchWorldBankIndicator(
   const swr = await getOrFetch(`wb:${indicatorCode}`, 604800, async () => {
     const r = await guardedFetch('world-bank', url, `wb:${indicatorCode}`, 604800);
     const arr = (r.json as unknown[])[1] as
-      | Array<{ country?: { value?: string; id?: string }; value?: number | null; date?: string }>
+      | Array<{ countryiso3code?: string; country?: { value?: string }; value?: number | null; date?: string }>
       | undefined;
+    // NOTE: countryiso3code is the real ISO3 for countries AND a 3-letter code
+    // for World Bank aggregate regions (AFE, WLD…). Callers filter aggregates
+    // via fetchWorldBankCountries() — do NOT use country.id (a 2-char internal
+    // code that fails the ISO3 length check and yields zero rows).
     const rows: WbRow[] = (arr ?? []).map((r2) => ({
       country: r2.country?.value ?? '',
-      iso3: r2.country?.id ?? '',
+      iso3: r2.countryiso3code ?? '',
       value: r2.value ?? null,
       year: Number(r2.date ?? 0),
     }));
     return rows;
   });
   return { data: swr.value, fetchedAt: swr.fetchedAt, stale: swr.stale };
+}
+
+/**
+ * Real ISO3 country codes — excludes World Bank aggregate regions (Africa
+ * Eastern & Southern, Arab World, World, …), which carry `region.id === 'NA'`.
+ * Cached for a week via guardedFetch. Used to filter indicator records down to
+ * actual countries for the "Top N countries" trade widgets. Returns an empty
+ * Set if the country-list fetch is unavailable (callers then show no rows
+ * rather than mislabel aggregates as countries).
+ */
+export async function fetchWorldBankCountries(): Promise<Set<string>> {
+  const url = 'https://api.worldbank.org/v2/country?format=json&per_page=400';
+  const r = await guardedFetch('world-bank', url, 'wb:countries', 604800);
+  const arr = (r.json as unknown[])[1] as
+    | Array<{ id?: string; region?: { id?: string } }>
+    | undefined;
+  const set = new Set<string>();
+  for (const c of arr ?? []) {
+    if (c.id && c.id.length === 3 && c.region?.id && c.region.id !== 'NA') set.add(c.id);
+  }
+  return set;
 }
 
 // ---- NASA EONET events ----
