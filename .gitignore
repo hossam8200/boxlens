@@ -11,3 +11,7 @@ node_modules/
 /tmp/
 .vercel
 .env*
+
+# build output (not committed)
+app/dist/
+dist/
