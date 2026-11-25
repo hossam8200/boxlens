@@ -1,7 +1,12 @@
 # Deploy BoxLens to GitHub Pages
 #
-# Auto-deploys index.html to GitHub Pages on every push to `main`.
-# One-time setup in the repo: Settings → Pages → Source = "GitHub Actions".
+# Builds the Vite app (with the Pages sub-path base) and stages a clean artifact
+# so that the modern dashboards app is the single root and the legacy tool lives
+# at /classic.html:
+#   - https://<user>.github.io/boxlens/             -> modern Vite dashboards app
+#   - https://<user>.github.io/boxlens/classic.html -> legacy single-file VGM tool
+#
+# One-time repo setup: Settings → Pages → Source = "GitHub Actions".
 name: Deploy to GitHub Pages
 
 on:
@@ -25,12 +30,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Build dashboards app (Pages base)
+        env:
+          # Repo is served at /boxlens/, so the modern app (now at the site root)
+          # must resolve its assets under /boxlens/. Vite reads VITE_BASE at build.
+          VITE_BASE: /boxlens/
+        run: npm run build
+
+      - name: Stage Pages artifact
+        run: |
+          set -e
+          mkdir _pages
+          # Modern Vite dashboards app at the site root (index.html + assets/).
+          cp -r app/dist/. _pages/
+          # Legacy single-file VGM tool at /classic.html (linked from the app nav).
+          cp classic.html _pages/classic.html
+          # Disable Jekyll so files/dirs starting with _ or weird casing survive.
+          touch _pages/.nojekyll
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'   # index.html lives at repo root
+          path: _pages
+
   deploy:
     needs: build
     runs-on: ubuntu-latest

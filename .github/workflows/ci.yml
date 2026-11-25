@@ -44,3 +44,31 @@ jobs:
         # Note: the committed dist/boxlens-core.umd.js is what the deployed app
         # loads. A future hardening step can assert `git diff --exit-code dist/`
         # once cross-environment esbuild determinism is confirmed.
+
+  dashboards:
+    name: app + api — lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Typecheck (app + api, strict)
+        run: npm run typecheck
+
+      - name: Unit tests (Vitest)
+        run: npm run test
+
+      - name: Build (Vite -> app/dist)
+        run: npm run build

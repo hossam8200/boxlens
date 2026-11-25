@@ -86,3 +86,38 @@ download/
   deploy.sh                        one-command deploy helpers
   .github/workflows/deploy-pages.yml   GitHub Pages auto-deploy
 ```
+
+## Dashboards module (slice #0, Vite + TypeScript + Vercel)
+
+The enterprise dashboards module sits alongside the legacy single-file app
+(which stays live at `/`). It is built with **Vite + TypeScript + ECharts +
+Leaflet**, served at **`/dashboards`** via committed `app/dist` +
+`vercel.json` rewrites, with **`/api/v1`** serverless functions on Vercel
+Hobby. Total recurring cost: $0.
+
+```
+app/                     Vite+TS dashboards app (served at /dashboards)
+  src/dashboards/
+    framework/           types, dataClass, provenance, theme, styles,
+                         registry, api(client), quotaClient, export,
+                         filters, layout, components
+    routes/              one lazy-loaded module per dashboard
+    shell.ts             sidebar + top bar + hash router + footer
+api/
+  _lib/                  http(Zod+RFC7807), cache(SWR), quota, provenance,
+                         circuitBreaker, vercel(types), fixtures
+  v1/                    health.ts, dashboards/[id].ts, dashboards/[id]/[widget].ts
+packages/core/           pure logic (iso6346, vgm, rules, geo, congestion,
+                         provenance) — imported by the app via a Vite alias
+```
+
+Contract: every widget payload is `{ value, unit, provenance: { source,
+fetchedAt, ttl, stale, class, method?, attribution? } }`. The `class` is one of
+LIVE / DAILY / ANNUAL / ESTIMATE / SAMPLE / UNAVAILABLE and renders as a badge
+with source + "updated X ago" on every KPI and chart. Every external call goes
+through the quota manager and cache; every failure degrades to a stale value
+or an explicit UNAVAILABLE state — never an empty chart.
+
+Eight dashboards land one per slice, in the spec's build order. Free sources
+are verified in `DATA_SOURCES.md`; IMF PortWatch has no public REST API
+(UNAVAILABLE) and aisstream.io needs a key + cron (UNAVAILABLE until supplied).

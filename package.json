@@ -1,0 +1,42 @@
+{
+  "name": "boxlens",
+  "version": "2.3.0",
+  "private": true,
+  "description": "BoxLens — container compliance & port intelligence. Dashboards module (Vite + TypeScript) + /api/v1 serverless functions on Vercel Hobby. $0 recurring cost.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:core": "npm --prefix packages/core run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.api.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint app/src api --ext .ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "@types/node": "^22.9.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "echarts": "^5.5.1",
+    "eslint": "^8.57.1",
+    "jsdom": "^25.0.1",
+    "leaflet": "^1.9.4",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

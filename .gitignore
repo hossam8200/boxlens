@@ -10,3 +10,4 @@ node_modules/
 # render artifacts (local only)
 /tmp/
 .vercel
+.env*

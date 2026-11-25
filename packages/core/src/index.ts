@@ -7,6 +7,7 @@ export * as vgm from './vgm';
 export * as rules from './rules';
 export * as geo from './geo';
 export * as congestion from './congestion';
+export * as risk from './risk';
 export * as provenance from './provenance';
 
 export type {

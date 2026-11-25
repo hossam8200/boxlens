@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
+  "framework": null,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": ".",
+  "cleanUrls": false,
   "trailingSlash": false,
   "headers": [
     {
@@ -11,5 +15,9 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/", "destination": "/app/dist/index.html" },
+    { "source": "/assets/:path*", "destination": "/app/dist/assets/:path*" }
   ]
 }

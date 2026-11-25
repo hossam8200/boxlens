@@ -6,6 +6,54 @@ product. **This demo build contains SAMPLE data modelled on these sources and
 makes NO live calls to any provider.** Every value shown is illustrative and
 labelled with a simulated `source` and `fetched_at`.
 
+---
+
+## Verified free sources (dashboards module, slice #0)
+
+The dashboards module (`app/` + `/api/v1`) targets only permanent free-tier,
+key-less or key-in-secret sources. Each endpoint was verified by a direct call
+on 2026-11-24 before implementation, per the spec's "verify before
+implementing" rule.
+
+| Source | Verified | Data class | Free-tier terms & attribution | Quota limit (self-imposed) | Cache TTL | Cadence | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Open-Meteo Marine + Forecast | 200, key-less | LIVE / DAILY | CC-BY 4.0; attribution required | 9 000/day | 30 min | hourly | ✅ wires in slice #3 |
+| Nager.Date | 200, key-less | DAILY | MIT; commercial OK | 1 000/day | 24 h | daily | ✅ wires in slice #3 |
+| Frankfurter (ECB FX) | 200 via `.dev` (`.app` 301→`.dev`) | DAILY | ECB reference rates; free, key-less | 1 000/day | 12 h | daily | ✅ wires in slice #6 |
+| World Bank Open Data | 200, key-less | ANNUAL | Open data; attribution requested | 4 000/day | 7 days | annual | ✅ wires in slice #5 |
+| NASA EONET | 200, key-less | LIVE | Open; credit NASA EONET | 2 000/day | 1 h | near-real-time | ✅ wires in slice #4 |
+| USGS earthquakes | 200, key-less (GeoJSON) | LIVE | Public domain (USGS) | 2 000/day | 1 h | hourly | ✅ wires in slice #4 |
+| UN/LOCODE | bundled CSV (no REST API) | (reference) | UNECE; open | n/a | static | periodic import | ✅ embedded |
+| **IMF PortWatch** | **404 — no public REST API** | UNAVAILABLE | n/a | blocked (limit 0) | n/a | n/a | ❌ chokepoint transit KPIs render UNAVAILABLE; hazard map (EONET/USGS) is real |
+| **aisstream.io** | requires API key + cron | LIVE | key server-side only; free-tier terms to confirm | 200/day | per cron interval | real-time (snapshot) | ⚠️ Vessel Activity renders UNAVAILABLE until a key is supplied as a Vercel/Actions secret |
+
+### Hard rules (dashboards module)
+
+- Every external call goes through the quota manager (`api/_lib/quota.ts`) and
+  cache (`api/_lib/cache.ts`). No client code calls a third-party API directly.
+- Every widget shows a data-class badge (LIVE / DAILY / ANNUAL / ESTIMATE /
+  SAMPLE / UNAVAILABLE), source name and "updated X ago".
+- Every failure degrades visibly: a stale value with age, or an explicit
+  UNAVAILABLE state — never an empty chart.
+- AIS shows vessels, not containers. ETAs / congestion / risk scores are
+  ESTIMATE with the method shown on hover and linked from Methodology.
+- No secrets in client code. Provider keys live only in Vercel/Actions env vars.
+- Store only anonymised aggregate counts from user activity; never store pasted
+  booking contents on the server.
+
+### Infrastructure (all free tier)
+
+| Service | Use | Free tier |
+| --- | --- | --- |
+| Vercel Hobby | serverless functions (`/api/v1`) + static host | 100 GB-h + 100k invocations/mo |
+| Upstash Redis | quota manager + cache (optional; in-memory fallback otherwise) | 10 000 commands/day |
+| Supabase | AIS snapshots + anonymised aggregates (Postgres) | 500 MB + API |
+| GitHub Actions cron | AIS snapshot ingestion job | 2 000 min/mo |
+
+---
+
+## Legacy demo sample data (single-file `index.html`)
+
 | Source | Purpose | Attribution | Commercial use | Rate / fair use | Refresh cadence | Failure mode | Live in this demo? |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | BIC BoxTech API | Container technical &amp; safety data (tare, max gross, max payload, max stacking, size-type, manufacturer, CSC plate, tank/reefer/smart data) | BIC — Bureau International des Containers | Governed by fair-use terms; license may be withdrawn. Verify before commercial use. Register as a consumer. | Fair-use; keep swappable; cache aggressively | Days–weeks (configurable TTL) | Stale data → visible badge | No — sample data |

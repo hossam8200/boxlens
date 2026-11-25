@@ -189,6 +189,52 @@ netlify.toml  vercel.json  deploy.sh    hosting configs + helper
 .github/workflows/deploy-pages.yml      GitHub Pages auto-deploy
 ```
 
+---
+
+## Dashboards module (`app/` + `/api/v1`) — slice #1
+
+An enterprise dashboards module built with **Vite + TypeScript + ECharts +
+Leaflet**, served at **`/dashboards`** alongside the legacy single-file app
+(which stays live at `/`). Every widget carries a **data-class badge**
+(LIVE / DAILY / ANNUAL / ESTIMATE / SAMPLE / UNAVAILABLE), source name and
+"updated X ago". Every external call goes through the quota manager and cache;
+every failure degrades to a stale value or an explicit UNAVAILABLE state —
+never an empty chart. **Total recurring cost: $0** (Vercel Hobby + Upstash /
+Supabase free tiers).
+
+**Navigation UX** (slice #1): the old sidebar is gone. The app opens on a
+**tile gallery** (`#/dashboards/`) — eight large gradient cards with icon,
+title, blurb, data-class badge and a "live/daily/… →" status hint. Clicking a
+tile enters that dashboard. A sticky topbar carries brand + breadcrumb + theme
+toggle and a horizontal **pill rail** so every dashboard is always one click
+away (no dropdown box anywhere). Responsive down to 390px: tiles reflow, the
+pill rail scrolls sideways inside its container.
+
+```bash
+npm install
+npm run dev          # Vite dev server (dashboards app at /dashboards/)
+npm run typecheck    # tsc strict — app + api
+npm test             # Vitest — root suite (80 tests) + core (80 tests)
+npm run build        # Vite -> app/dist (committed; served at /dashboards)
+```
+
+**All eight dashboards are built** (each its own lazy-loaded chunk):
+
+| # | Dashboard | Source / data-class |
+| --- | --- | --- |
+| 1 | Executive Overview | Own-app data (SAMPLE in the demo) — KPIs, 30-day trend, pass/warn/fail donut, top-10 failures, active-ports map |
+| 2 | Compliance Quality | Own-app data (SAMPLE) — per-rule matrix, owner coverage, ISO 6346 + VGM tables |
+| 3 | Port Weather & Operational Risk | Open-Meteo Marine (DAILY) + Nager.Date + risk score (ESTIMATE, `core/risk.ts`) |
+| 4 | Chokepoints & Disruptions | NASA EONET + USGS earthquakes (LIVE) on a world hazard map; IMF PortWatch transit KPIs UNAVAILABLE |
+| 5 | Trade & Port Context | World Bank Open Data (ANNUAL) — trade % GDP, container throughput, LPI |
+| 6 | Cost & Currency | Frankfurter ECB FX (DAILY) + a SAMPLE freight spot estimate |
+| 7 | Vessel Activity (AIS) | UNAVAILABLE without `AISSTREAM_KEY` + cron — honest explainer + architecture diagram |
+| 8 | Platform Health (admin) | LIVE budget snapshot (quota manager) + SAMPLE cache/error/breaker metrics |
+
+See [`CHANGELOG.md`](CHANGELOG.md) and [`DATA_SOURCES.md`](DATA_SOURCES.md)
+for the verified free-source findings (IMF PortWatch = UNAVAILABLE;
+aisstream.io needs a key + cron).
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Data sources are credited per

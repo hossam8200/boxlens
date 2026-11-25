@@ -88,7 +88,7 @@ code{font-family:var(--mono);background:var(--surface-2);padding:1px 5px;border-
 .alert.bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
 .alert.info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
 .alert.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
-.alert.legal{background:var(--warn-bg);color:var(--warn);border-color:var(--warn);font-size:.82rem}
+.alert.legal{background:var(--info-bg);color:var(--info);border-color:var(--info);font-size:.82rem}
 .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .prov{font-size:.68rem;color:var(--muted);display:inline-flex;align-items:center;gap:3px}
 .prov::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted)}
@@ -146,7 +146,11 @@ main{padding:20px 0 60px}
 .footer{border-top:1px solid var(--border);background:var(--surface);padding:24px 0;color:var(--muted);font-size:.83rem}
 .footer a{color:var(--muted)}
 .footer .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px;max-width:1280px;margin:0 auto;padding:0 16px}
-.disclaimer-strip{background:var(--warn-bg);color:var(--warn);font-size:.78rem;padding:7px 16px;text-align:center;border-bottom:1px solid var(--border)}
+.disclaimer-strip{background:var(--info-bg);color:var(--info);font-size:.78rem;padding:7px 16px;text-align:center;border-bottom:1px solid var(--border)}
+/* Embed mode (?embed=1): hide redundant chrome when rendered inside the modern shell's iframe. */
+body.embed .disclaimer-strip{display:none}
+body.embed .topbar .brand{display:none}
+body.embed #localeBtn,body.embed #themeBtn{display:none}
 
 /* toast */
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;align-items:center}
@@ -194,8 +198,9 @@ kbd{font-family:var(--mono);font-size:.78rem;background:var(--surface-2);border:
 </style>
 </head>
 <body>
+<script>if(new URLSearchParams(location.search).get('embed')==='1'){document.body.classList.add('embed')}</script>
 <div class="disclaimer-strip" id="disclaimerStrip">
-  ⚠ BoxLens assists with data and calculations only. It does NOT certify a VGM and does not replace the shipper's legal responsibility. Estimates and missing data are never presented as official facts.
+  Decision-support tool: BoxLens assists with data and calculations, but does not certify a VGM. Estimates and missing data are labelled, never shown as official facts.
 </div>
 
 <header class="topbar">
@@ -204,6 +209,7 @@ kbd{font-family:var(--mono);font-size:.78rem;background:var(--surface-2);border:
     <nav class="nav" id="mainNav" aria-label="Main navigation"></nav>
     <div class="grow"></div>
     <div class="top-actions">
+      <a href="../" class="icon-btn" title="Open the modern dashboards app" aria-label="Open modern dashboards app" style="font-weight:600;text-decoration:none">📊 Dashboards</a>
       <span class="budget-pill" id="budgetPill" title="Provider budget guard" tabindex="0" role="button" aria-label="Provider budget status">
         <span class="dot" style="background:var(--ok)"></span>
         <span id="budgetTxt">BIC 98%</span>
@@ -722,7 +728,7 @@ window.addEventListener('hashchange',route);
 function pageHead(title,sub,extra){
   return '<div class="page-head spread"><div><h1>'+esc(title)+'</h1>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(extra||'')+'</div>';
 }
-function legalBanner(){return '<div class="alert legal" role="status">⚠ BoxLens assists only — no VGM certification, no container-level tracking. Estimates and missing data are labelled, never presented as official facts.</div>'}
+function legalBanner(){return '<div class="alert legal" role="status">Decision-support tool: BoxLens assists with data and calculations, but does not certify a VGM and does not replace the shipper\'s legal responsibility under SOLAS VI/2. Estimates and missing data are labelled, never shown as official facts.</div>'}
 function statTile(v,l,accent){return '<div class="kpi"><div class="v" style="color:'+(accent||'var(--primary)')+'">'+v+'</div><div class="l">'+l+'</div></div>'}
 function emptyState(ic,msg){return '<div class="empty"><div class="ic">'+ic+'</div><div>'+msg+'</div></div>'}
 
@@ -985,7 +991,7 @@ function openVgmSheet(v,spec,owner){
   <tr><th>Compliance check</th><td>${v.within?'Within limits':'⚠ EXCEEDS LIMIT'}</td></tr>
   <tr><th>Generated</th><td>${new Date().toISOString()}</td></tr>
   </table>
-  <div class="warn"><b>Legal disclaimer.</b> BoxLens assists with data and calculations only. This sheet is a <b>draft support document, not a certified VGM</b>. It does not replace the shipper's legal responsibility under SOLAS regulation VI/2. Tare weight shown is from third-party data (${esc(v.source)}) and may be stale or partial; the shipper must verify. Never present estimates or missing data as official facts.</div>
+  <div class="alert info"><b>Compliance note.</b> BoxLens is a decision-support tool; this sheet is a draft support document, not a certified VGM. The shipper's legal responsibility under SOLAS regulation VI/2 is not replaced. Tare weight is from third-party data (${esc(v.source)}) and may be stale or partial — verify before use. Estimates and missing data are labelled, never presented as official facts.</div>
   <div class="foot">BoxLens · Data sources: BIC BoxTech, BIC Codes · Generated ${new Date().toISOString()} · Provisional, subject to provider terms.</div>
   <script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script>
   </body></html>`);
@@ -1402,7 +1408,7 @@ function renderMeth(tab){
   } else if(tab==='vgm'){
     body.innerHTML=`<div class="card"><h3>VGM — Method 2 (SOLAS)</h3><p>VGM = tare weight + weight of cargo + packing + dunnage, entered by the user. BoxLens computes the value and warns if VGM exceeds max gross mass or cargo exceeds max payload.</p>
     <div class="card-2 mono small">VGM = tare + cargo + packing + dunnage<br>if VGM &gt; max_gross_mass → FAIL (overweight)<br>if cargo &gt; max_payload → FAIL (payload exceeded)</div>
-    <div class="alert warn"><b>Not certified.</b> The declaration sheet is a <b>draft support document</b>. It does not replace the shipper's legal responsibility under SOLAS VI/2. Tare from third-party data may be stale or partial; the shipper must verify.</div>
+    <div class="alert info"><b>Compliance note.</b> The declaration sheet is a draft support document, not a certified VGM. It does not replace the shipper's legal responsibility under SOLAS VI/2. Tare from third-party data may be stale or partial — the shipper must verify before use.</div>
     <h3 style="margin-top:16px">ISO 6346 check-digit algorithm</h3>
     <div class="card-2 mono small">1. Map letters A–Z to values (skip multiples of 11): A=10, B=12, C=13 …<br>2. Multiply each of first 10 chars by 2^position (pos 0..9)<br>3. Sum, mod 11, mod 10 → check digit</div>
     <div id="methGolden"></div></div>`;
