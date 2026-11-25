@@ -307,26 +307,24 @@ export interface NearbyFacility {
   distanceKm: number;
 }
 
-const OVERPASS_TIMEOUT_MS = 12000;
+const OVERPASS_TIMEOUT_MS = 8000;
 
 export async function fetchOverpassNearby(
   lat: number,
   lng: number,
   radiusM = 15000,
 ): Promise<{ data: NearbyFacility[]; fetchedAt: number; stale: boolean }> {
-  // Lean query: only the high-signal container-terminal / depot tags. The
-  // broad `industrial=port` tag was dropped — it matches too many features and
-  // made the query time out near dense ports like Rotterdam. Server-side
-  // timeout 12s mirrors the fetch timeout so Overpass stops early.
+  // Nodes-only query: ways require geometry computation and time out near dense
+  // ports (Rotterdam) when called from a Vercel function far from the EU
+  // Overpass instances. Cargo terminals + depots are commonly mapped as nodes
+  // with the same tags; nodes carry their own lat/lon (no `center` needed).
+  // Server-side timeout 8s mirrors the fetch timeout so Overpass stops early.
   const q =
-    `[out:json][timeout:12];(` +
+    `[out:json][timeout:8];(` +
     `node["seamark:type"="cargo_terminal"](around:${radiusM},${lat},${lng});` +
-    `way["seamark:type"="cargo_terminal"](around:${radiusM},${lat},${lng});` +
     `node["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
-    `way["man_made"="container_terminal"](around:${radiusM},${lat},${lng});` +
     `node["industrial"="depot"](around:${radiusM},${lat},${lng});` +
-    `way["industrial"="depot"](around:${radiusM},${lat},${lng});` +
-    `);out tags center 20;`;
+    `);out tags 25;`;
   const INSTANCES = [
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass-api.de/api/interpreter',
