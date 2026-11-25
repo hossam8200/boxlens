@@ -40,6 +40,7 @@ const TOOLS: ReadonlyArray<ToolInfo> = [
   { icon: '⚖️', name: 'VGM Method 2 (SOLAS)', badge: 'DRAFT', badgeCls: 'dc-estimate', body: 'Compute VGM = tare + cargo + packing + dunnage and check it against the container\u2019s max gross and max payload. Labelled a draft — never a certification; the shipper keeps the legal SOLAS VI/2 responsibility.' },
   { icon: '🏷️', name: 'BIC owner lookup', badge: 'PARTIAL', badgeCls: 'dc-sample', body: 'Resolve a 4-letter owner code to its shipping line (curated subset of the public BIC BoxTech register). Production wires the live BIC Codes API with per-prefix IndexedDB caching.' },
   { icon: '🗺️', name: 'Port & country filter', badge: 'LIVE', badgeCls: 'dc-daily', body: 'Full UN/LOCODE sea-port search with a cascading country \u2192 port filter — selecting a country narrows the port list to that country only.' },
+  { icon: '🧭', name: 'Sea route & rough ETA', badge: 'ESTIMATE', badgeCls: 'dc-estimate', body: 'Chokepoint-aware great-circle estimate between two ports: the direct arc is tested against a coarse landmass mask and rerouted via Suez / Panama / Cape of Good Hope / Cape Horn when it would cross a continent. Distance × detour factor, ETA from an explicit assumed speed. Pure offline — verify against the carrier schedule.' },
   { icon: '🔁', name: 'Honest degradation', badge: 'RULE', badgeCls: 'dc-daily', body: 'Every value keeps a provenance badge (source, fetched-at, status). AIS shows vessels not containers; ETAs are estimates with method and age; missing means missing — never fabricated.' },
 ];
 
@@ -70,7 +71,7 @@ export function renderFeatures(root: HTMLElement, onSelect: (id: DashboardId) =>
   // ---- Hero ----
   const hero = el('div', { class: 'glass feat-hero' });
   hero.innerHTML =
-    '<div class="feat-hero-eyebrow">BoxLens · v2.4</div>' +
+    '<div class="feat-hero-eyebrow">BoxLens · v2.5</div>' +
     '<h1>Features &amp; Capabilities</h1>' +
     '<p class="muted">A single application for container-compliance and port intelligence — nine dashboards, ' +
     'six keyless data sources, an ISO 6346 + size/type + VGM Method 2 toolset, honest data-class labelling, ' +

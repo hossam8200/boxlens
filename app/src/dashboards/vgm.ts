@@ -2,7 +2,7 @@
 // the modern shell. NO iframe: imports the real @boxlens/core (ISO 6346 + VGM
 // Method 2) and the ported BIC owner / size-type / container reference data.
 // Reached at #/vgm from the topbar nav — one application, one URL.
-import { iso6346, sizetype, vgm } from '@boxlens/core';
+import { iso6346, sizetype, seaway, vgm } from '@boxlens/core';
 import type { ValidationResult, ContainerSpec } from '@boxlens/core';
 import { el } from './framework/components';
 import { OWNERS, SIZE_TYPES, CONTAINERS, SAMPLE_CONTAINERS } from '../vgm/data';
@@ -13,11 +13,40 @@ interface SessionLookup {
   when: number;
 }
 
+/** Major ports with coordinates for the sea-route estimator (curated, public). */
+interface RoutePort {
+  code: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+const MAJOR_PORTS: readonly RoutePort[] = Object.freeze([
+  { code: 'NLRTM', name: 'Rotterdam', lat: 51.95, lng: 4.07 },
+  { code: 'DEHAM', name: 'Hamburg', lat: 53.54, lng: 9.93 },
+  { code: 'BEANR', name: 'Antwerp-Bruges', lat: 51.32, lng: 4.31 },
+  { code: 'GBFXT', name: 'Felixstowe', lat: 51.95, lng: 1.31 },
+  { code: 'USNYC', name: 'New York / NJ', lat: 40.67, lng: -74.04 },
+  { code: 'USLAX', name: 'Los Angeles', lat: 33.73, lng: -118.26 },
+  { code: 'USSAV', name: 'Savannah', lat: 32.08, lng: -81.09 },
+  { code: 'BRSSZ', name: 'Santos', lat: -23.97, lng: -46.3 },
+  { code: 'CNSHA', name: 'Shanghai (Yangshan)', lat: 30.62, lng: 122.07 },
+  { code: 'CNYTN', name: 'Yantian (Shenzhen)', lat: 22.59, lng: 114.31 },
+  { code: 'SGSIN', name: 'Singapore (PSA)', lat: 1.27, lng: 103.84 },
+  { code: 'HKHKG', name: 'Hong Kong', lat: 22.32, lng: 114.17 },
+  { code: 'AEJEA', name: 'Jebel Ali', lat: 25.01, lng: 55.06 },
+  { code: 'INMUN', name: 'Mumbai (JNPT)', lat: 18.95, lng: 72.95 },
+  { code: 'ESALG', name: 'Algeciras', lat: 36.13, lng: -5.44 },
+  { code: 'PANUM', name: 'Manzanillo (PA)', lat: 9.35, lng: -79.9 },
+]);
+
 const lookups: SessionLookup[] = [];
 const manual: Record<string, ContainerSpec> = {};
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escAttr(s: string): string {
+  return esc(s).replace(/"/g, '&quot;');
 }
 
 /** Render the whole VGM tool into `root`. Sync (no network). */
@@ -73,6 +102,25 @@ export function renderVgm(root: HTMLElement): void {
       .join(', ') +
     '</div>';
   left.appendChild(stCard);
+
+  // ---- Sea route & rough ETA card (chokepoint-aware estimate, offline) ----
+  const routeCard = el('div', { class: 'glass' });
+  const portOpts = MAJOR_PORTS.map(
+    (p) => `<option value="${esc(p.code)}">${esc(p.name)} (${esc(p.code)})</option>`,
+  ).join('');
+  routeCard.innerHTML =
+    '<h3>Sea route &amp; rough ETA</h3>' +
+    '<div class="tiny muted">Chokepoint-aware great-circle estimate: the direct arc is tested against a coarse ' +
+    'landmass mask and rerouted via Suez / Panama / Cape of Good Hope / Cape Horn when it would cross a ' +
+    'continent. ETA uses an explicit assumed speed. Estimate — verify against the carrier schedule.</div>' +
+    '<div class="vgm-calc-grid">' +
+    '<div><label>From port</label><select id="srFrom" class="mono">' + portOpts + '</select></div>' +
+    '<div><label>To port</label><select id="srTo" class="mono">' + portOpts + '</select></div>' +
+    '<div><label>Speed (kn)</label><input id="srSpeed" type="number" value="18" min="1" max="40" /></div>' +
+    '</div>' +
+    '<div class="vgm-row"><button class="btn primary" id="srCalc">Compute route</button></div>' +
+    '<div id="srResult" class="vgm-result"></div>';
+  left.appendChild(routeCard);
 
   // ---- Spec card (right) ----
   const specCard = el('div', { class: 'glass', id: 'specCard' });
@@ -162,6 +210,14 @@ export function renderVgm(root: HTMLElement): void {
       doDecodeSizeType(a.dataset.s ?? '');
     });
   }
+
+  // ---- sea route & ETA ----
+  const srFrom = $<HTMLSelectElement>('#srFrom')!;
+  const srTo = $<HTMLSelectElement>('#srTo')!;
+  srFrom.value = 'NLRTM';
+  srTo.value = 'CNSHA';
+  $<HTMLButtonElement>('#srCalc')!.addEventListener('click', () => doSeaRoute(srFrom.value, srTo.value, $<HTMLInputElement>('#srSpeed')!.value));
+  srTo.addEventListener('change', () => doSeaRoute(srFrom.value, srTo.value, $<HTMLInputElement>('#srSpeed')!.value));
 
   $<HTMLButtonElement>('#vgmCalc')!.addEventListener('click', computeVgm);
   $<HTMLButtonElement>('#vgmClear')!.addEventListener('click', () => {
@@ -362,6 +418,40 @@ function doDecodeSizeType(raw: string): void {
     '<div class="tiny muted" style="margin-top:8px">Source: ' +
     esc(spec?.source ?? 'ISO 6346 Annex A/C (offline)') +
     '. Nominal ISO 668 values — verify against the CSC plate for a VGM declaration.</div>';
+}
+
+/** Compute a chokepoint-aware sea route + rough ETA with @boxlens/core (offline). */
+function doSeaRoute(fromCode: string, toCode: string, speedRaw: string): void {
+  const box = document.querySelector<HTMLElement>('#srResult');
+  if (!box) return;
+  const from = MAJOR_PORTS.find((p) => p.code === fromCode);
+  const to = MAJOR_PORTS.find((p) => p.code === toCode);
+  if (!from || !to) {
+    box.innerHTML = '<div class="vgm-alert vgm-warn">Select both ports.</div>';
+    return;
+  }
+  if (from.code === to.code) {
+    box.innerHTML = '<div class="vgm-alert vgm-warn">Origin and destination are the same port.</div>';
+    return;
+  }
+  const speed = Math.max(1, Math.min(40, Number(speedRaw) || 18));
+  const r = seaway.seaRoute({ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }, { speedKn: speed });
+  const legs = r.path
+    .map((w) => w.label ?? `${w.lat.toFixed(1)}°, ${w.lng.toFixed(1)}°`)
+    .join(' → ');
+  box.innerHTML =
+    '<div class="spread"><div class="mono"><b>' + esc(from.name) + ' → ' + esc(to.name) + '</b></div>' +
+    '<span class="dc-badge dc-estimate"><span class="dot"></span>ESTIMATE</span></div>' +
+    '<div class="vgm-kv-grid">' +
+    kv('Distance', fmt(r.distanceKm, 'km') + ' · ' + fmt(r.distanceNm, 'NM')) +
+    kv('Rough ETA', r.etaDays + ' d (' + r.etaHours + ' h)') +
+    kv('Assumed speed', r.speedKn + ' kn') +
+    kv('Detour factor', String(r.detourFactor)) +
+    kv('Route via', r.chokepoints.length ? esc(r.chokepoints.join(' + ')) : 'direct open-ocean arc') +
+    kv('Path', esc(legs)) +
+    '</div>' +
+    '<div class="tiny muted" style="margin-top:8px" title="' + escAttr(r.method) + '">' +
+    '<span class="dc-badge dc-estimate"><span class="dot"></span>method</span> ' + esc(r.method) + '</div>';
 }
 
 function drawRecent(root: HTMLElement): void {
