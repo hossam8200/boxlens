@@ -325,26 +325,44 @@ export async function fetchOverpassNearby(
     `node["industrial"="port"](around:${radiusM},${lat},${lng});` +
     `way["industrial"="port"](around:${radiusM},${lat},${lng});` +
     `);out tags center 40;`;
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`;
+  const INSTANCES = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+  ];
+  const body = `data=${encodeURIComponent(q)}`;
   const cacheKey = `overpass:${lat.toFixed(2)},${lng.toFixed(2)},${radiusM}`;
   const swr = await getOrFetch(cacheKey, 86_400, async () => {
     const breaker = getBreaker('overpass');
     if (!breaker.canRequest()) throw new Error('overpass circuit open');
     const quota = await checkAndIncrement('overpass');
     if (!quota.allowed) throw new Error('overpass quota exhausted');
-    try {
-      const res = await withTimeout(
-        fetch(url, { headers: { accept: 'application/json' } }),
-        OVERPASS_TIMEOUT_MS,
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      breaker.recordSuccess();
-      return json;
-    } catch (err) {
-      breaker.recordFailure();
-      throw err instanceof Error ? err : new Error(String(err));
+    // Overpass public instances require a descriptive User-Agent (a missing/
+    // generic UA gets HTTP 406) and prefer POST for queries. Try the primary
+    // instance, then the kumi mirror as a fallback before failing the call.
+    let lastErr: unknown;
+    for (const base of INSTANCES) {
+      try {
+        const res = await withTimeout(
+          fetch(base, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/x-www-form-urlencoded',
+              'user-agent': 'BoxLens/2.7 (port-intelligence; https://boxlens.vercel.app)',
+            },
+            body,
+          }),
+          OVERPASS_TIMEOUT_MS,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status} @ ${base}`);
+        const json = await res.json();
+        breaker.recordSuccess();
+        return json;
+      } catch (err) {
+        lastErr = err;
+      }
     }
+    breaker.recordFailure();
+    throw lastErr instanceof Error ? lastErr : new Error('all Overpass instances failed');
   });
   const els = (
     swr.value as {

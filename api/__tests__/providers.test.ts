@@ -78,4 +78,20 @@ describe('fetchOverpassNearby', () => {
     const r = await fetchOverpassNearby(40.0, -40.0, 15000); // unique coord -> no cache collision
     expect(r.data).toEqual([]);
   });
+
+  it('falls back to the second Overpass instance when the primary fails', async () => {
+    const body = {
+      elements: [
+        { type: 'node', id: 9, lat: 1.3, lon: 103.9, tags: { name: 'Tanjong Pagar', 'seamark:type': 'cargo_terminal' } },
+      ],
+    };
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 504, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => body }) as unknown as typeof globalThis.fetch;
+    const r = await fetchOverpassNearby(1.26, 103.84, 15000); // Singapore, unique key
+    expect(r.data.length).toBe(1);
+    expect(r.data[0]!.name).toBe('Tanjong Pagar');
+    expect(r.data[0]!.type).toBe('Cargo terminal');
+  });
 });
