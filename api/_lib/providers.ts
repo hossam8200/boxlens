@@ -88,6 +88,56 @@ export async function fetchOpenMeteoMarine(
   return { data: swr.value, fetchedAt: swr.fetchedAt, stale: swr.stale };
 }
 
+// ---- Open-Meteo 7-day daily forecast (executive/compliance real trend) ----
+
+export interface DailyForecast {
+  date: string;
+  windMaxKnots: number;
+  waveMaxM: number;
+  visMeanKm: number;
+}
+
+export async function fetchOpenMeteoDaily7(
+  lat: number,
+  lng: number,
+): Promise<{ data: DailyForecast[]; fetchedAt: number; stale: boolean }> {
+  const wxUrl =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+    `&daily=wind_speed_10m_max,visibility_mean&timezone=auto&forecast_days=7`;
+  const marineUrl =
+    `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}` +
+    `&daily=wave_height_max&timezone=auto&forecast_days=7`;
+  const cacheKey = `om-daily7:${lat.toFixed(2)},${lng.toFixed(2)}`;
+  const swr = await getOrFetch(cacheKey, 1800, async () => {
+    const [wx, marine] = await Promise.all([
+      guardedFetch('open-meteo', wxUrl, `om:wx7:${lat},${lng}`, 1800),
+      guardedFetch('open-meteo', marineUrl, `om:marine7:${lat},${lng}`, 1800),
+    ]);
+    const d = (wx.json as {
+      daily?: { time?: string[]; wind_speed_10m_max?: number[]; visibility_mean?: number[] };
+    }).daily ?? {};
+    const m = (marine.json as { daily?: { time?: string[]; wave_height_max?: number[] } }).daily ?? {};
+    const times = d.time ?? [];
+    const out: DailyForecast[] = [];
+    for (let i = 0; i < times.length; i++) {
+      const windRaw = d.wind_speed_10m_max?.[i];
+      const visRaw = d.visibility_mean?.[i];
+      const waveRaw = m.wave_height_max?.[i];
+      const windKmh = typeof windRaw === 'number' ? windRaw : 0;
+      const visM = typeof visRaw === 'number' ? visRaw : 10000;
+      const wave = typeof waveRaw === 'number' ? waveRaw : 0;
+      out.push({
+        date: times[i] ?? '',
+        windMaxKnots: Math.round((windKmh / 1.852) * 10) / 10,
+        waveMaxM: Math.round(wave * 10) / 10,
+        visMeanKm: Math.round((visM / 1000) * 10) / 10,
+      });
+    }
+    return out;
+  });
+  return { data: swr.value, fetchedAt: swr.fetchedAt, stale: swr.stale };
+}
+
 // ---- Nager.Date public holidays ----
 
 export interface Holiday {

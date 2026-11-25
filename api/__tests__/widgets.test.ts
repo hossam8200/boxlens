@@ -1,24 +1,98 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { resolveWidget, WIDGET_IDS_BY_DASHBOARD } from '../_lib/widgets';
 import type { DashboardId } from '../../app/src/dashboards/framework/types';
 
-describe('resolveWidget — own-app-data fixtures', () => {
-  it('executive widgets return the SAMPLE fixture value', async () => {
+// Executive + compliance widgets are now derived from REAL Open-Meteo marine
+// conditions per port (no SAMPLE fixtures). Stub the provider responses so the
+// tests are deterministic and network-free: every port resolves to a FAIL
+// condition (wave 3.5 m >= 3 m), so counts/rates are predictable.
+const OM_BODY = {
+  current: {
+    wave_height: 3.5,
+    wave_period: 6,
+    swell_wave_height: 0.5,
+    wind_speed_10m: 40, // ~21.6 kt -> pass on wind, but wave dominates -> fail
+    visibility: 5000, // 5 km -> pass
+  },
+  utc_offset_seconds: 0,
+  daily: {
+    time: ['2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29', '2026-11-30', '2026-12-01'],
+    wind_speed_10m_max: [10, 25, 40, 15, 20, 30, 5],
+    visibility_mean: [10000, 4000, 800, 10000, 5000, 2000, 10000],
+    wave_height_max: [0.5, 1.8, 3.2, 0.8, 1.2, 2.5, 0.4],
+  },
+};
+
+const fetchMock = vi.fn(async () => ({
+  ok: true,
+  status: 200,
+  json: async () => OM_BODY,
+}));
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', fetchMock);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('resolveWidget — executive (real operational conditions)', () => {
+  it('checks-today = number of ports in the global sample, badged DAILY', async () => {
     const p = await resolveWidget('executive', 'checks-today');
-    expect(p.provenance.class).toBe('SAMPLE');
-    expect(p.value).toBe(1284);
-    expect(p.series).toBeDefined();
-    expect(p.series!.length).toBeGreaterThan(0);
+    expect(p.provenance.class).toBe('DAILY');
+    expect(p.value).toBe(8); // MAJOR_PORTS global sample
+    expect(p.provenance.source).toMatch(/Open-Meteo/i);
   });
 
-  it('compliance widgets return the SAMPLE fixture value', async () => {
+  it('fail-rate reflects the real classification (all fail -> 100%)', async () => {
+    const p = await resolveWidget('executive', 'fail-rate');
+    expect(p.provenance.class).toBe('DAILY');
+    expect(p.value).toBe(100);
+    expect(p.unit).toBe('%');
+    expect(p.series?.length).toBe(7); // 7-day trend
+  });
+
+  it('active-ports rows carry real wind/wave/class for the map + table', async () => {
+    const p = await resolveWidget('executive', 'active-ports');
+    const rows = p.rows ?? [];
+    expect(rows.length).toBe(8);
+    expect(rows[0]).toHaveProperty('Wind');
+    expect(rows[0]).toHaveProperty('Wave');
+    expect(rows[0]).toHaveProperty('Class');
+  });
+
+  it('free-tier-budget is LIVE quota (not weather)', async () => {
+    const p = await resolveWidget('executive', 'free-tier-budget');
+    expect(p.provenance.class).toBe('LIVE');
+    expect(typeof p.value).toBe('number');
+  });
+});
+
+describe('resolveWidget — compliance (real operational conditions)', () => {
+  it('iso-violations counts failing ports (DAILY, real)', async () => {
     const p = await resolveWidget('compliance', 'iso-violations');
-    expect(p.provenance.class).toBe('SAMPLE');
-    expect(p.value).toBe(17);
+    expect(p.provenance.class).toBe('DAILY');
+    expect(p.value).toBe(8); // all 8 sample ports fail (wave >= 3 m)
     expect(p.rows?.length).toBeGreaterThan(0);
   });
 
-  it('health non-budget widgets return the SAMPLE fixture', async () => {
+  it('vgm-overweight is an honest ESTIMATE proxy', async () => {
+    const p = await resolveWidget('compliance', 'vgm-overweight');
+    expect(p.provenance.class).toBe('ESTIMATE');
+    expect(p.value).toBe(8); // wave >= 2 m on all sample ports
+    expect(p.provenance.method).toMatch(/ESTIMATE|no free/i);
+  });
+
+  it('rule-matrix has per-rule Pass/Warn/Fail counts', async () => {
+    const p = await resolveWidget('compliance', 'rule-matrix');
+    const rows = p.rows ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    const overall = rows.find((r) => String(r['Rule']).includes('Overall'));
+    expect(overall).toBeTruthy();
+    expect(Number(overall!['Fail'])).toBe(8);
+  });
+
+  it('health non-budget widgets still return the SAMPLE fixture', async () => {
     const p = await resolveWidget('health', 'cache-hit-rate');
     expect(p.provenance.class).toBe('SAMPLE');
     expect(p.value).toBe(91.3);
@@ -53,8 +127,9 @@ describe('resolveWidget — UNAVAILABLE honesty', () => {
 
 describe('resolveWidget — never throws', () => {
   it('returns a payload (never rejects) for every registered widget id', async () => {
-    // Skip provider-backed widgets (weather/chokepoints/trade/cost) — they call
-    // real fetch and are exercised separately. Pure paths only here.
+    // Skip the provider widgets that call real third-party APIs not stubbed
+    // here (weather/chokepoints/trade/cost). executive/compliance go through
+    // the stubbed Open-Meteo fetch above.
     const skip = new Set<DashboardId>(['weather', 'chokepoints', 'trade', 'cost']);
     for (const [dash, ids] of Object.entries(WIDGET_IDS_BY_DASHBOARD) as [DashboardId, string[]][]) {
       if (skip.has(dash as DashboardId)) continue;

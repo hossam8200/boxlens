@@ -15,8 +15,9 @@ import {
   fetchEonetEvents,
   fetchUsgsEarthquakes,
 } from './providers.js';
-import { executiveWidget, complianceWidget, healthWidget } from './fixtures.js';
-import type { DashboardId, WidgetPayload } from '../../app/src/dashboards/framework/types.js';
+import { healthWidget } from './fixtures.js';
+import { getPortConditions, getPortTrend7, portCount } from './portConditions.js';
+import type { DashboardId, WidgetPayload, Provenance, DataClass } from '../../app/src/dashboards/framework/types.js';
 import type { ProviderLimit } from './quota.js';
 import { PROVIDER_LIMITS, quotaSnapshot } from './quota.js';
 
@@ -38,6 +39,19 @@ const METHODS = {
   freight:
     'Freight index is a SAMPLE estimate derived from public spot-rate ranges ' +
     '(Drewry WCI / SCFI bands); wire a paid feed for live values.',
+  operational:
+    'Operational compliance derived from real Open-Meteo Marine conditions per ' +
+    'port in the filter scope. Each port is classified pass/warn/fail: fail = ' +
+    'wind \u226534 kt OR wave \u22653 m OR visibility \u22641 km; warn = wind \u226522 kt OR wave ' +
+    '\u22651.5 m OR visibility \u22644 km; pass otherwise. Headline KPIs, the per-port ' +
+    'table, the active-ports map and the 7-day trend (representative-port ' +
+    'forecast) are all real. Container-compliance KPIs that need the app\u2019s own ' +
+    'check-log DB are not available on the free tier.',
+  vgm:
+    'VGM overweight is an ESTIMATE: there is no free public container-weight ' +
+    'feed. The proxy flags ports where heavy sea (wave \u2265 2 m) elevates ' +
+    'weighbridge-motion risk for VGM Method 2 weighing. Wire a paid VGM/AIS ' +
+    'cargo feed for real overweight declarations.',
 };
 
 /** Resolve a single widget payload, never throwing. */
@@ -49,21 +63,21 @@ export async function resolveWidget(
   try {
     switch (dashboard) {
       case 'executive':
-        return executiveWidget(widgetId);
+        return await resolveExecutiveWidget(widgetId, filters);
       case 'compliance':
-        return complianceWidget(widgetId);
+        return await resolveComplianceWidget(widgetId, filters);
       case 'weather':
-        return resolveWeatherWidget(widgetId, filters);
+        return await resolveWeatherWidget(widgetId, filters);
       case 'chokepoints':
-        return resolveChokepointsWidget(widgetId);
+        return await resolveChokepointsWidget(widgetId);
       case 'trade':
-        return resolveTradeWidget(widgetId);
+        return await resolveTradeWidget(widgetId);
       case 'cost':
-        return resolveCostWidget(widgetId);
+        return await resolveCostWidget(widgetId);
       case 'vessel':
-        return resolveVesselWidget(widgetId);
+        return await resolveVesselWidget(widgetId);
       case 'health':
-        return resolveHealthWidget(widgetId);
+        return await resolveHealthWidget(widgetId);
       default:
         return unavailable(widgetId, dashboard, 'Unknown dashboard.');
     }
@@ -82,6 +96,221 @@ export async function resolveDashboard(
     widgetIds.map(async (w) => ({ widget: w, payload: await resolveWidget(dashboard, w, filters) })),
   );
   return entries;
+}
+
+// ---- Executive + Compliance (real operational conditions) ----
+//
+// Reframed from SAMPLE container-compliance fixtures to real, free, keyless
+// Open-Meteo marine conditions per port in the current filter scope. Each port
+// is classified pass/warn/fail (see portConditions.classify); the headline KPIs,
+// per-port table, active-ports map and 7-day trend are all derived from that
+// real data. VGM-overweight stays an honest ESTIMATE (no free weight feed).
+
+const COND_SOURCE = 'Open-Meteo Marine (real per-port conditions)';
+const COND_ATTR = '\u00a9 Open-Meteo (CC-BY 4.0) \u00b7 UN/LOCODE (UNECE)';
+
+function condProv(stale: boolean, opts: { klass?: DataClass; method?: string } = {}): Provenance {
+  return buildProvenance({
+    source: COND_SOURCE,
+    class: opts.klass ?? 'DAILY',
+    ttl: 1800,
+    stale,
+    method: opts.method ?? METHODS.operational,
+    attribution: COND_ATTR,
+  });
+}
+
+function pct(n: number, d: number): number {
+  return d ? Math.round((n / d) * 1000) / 10 : 0;
+}
+
+async function resolveExecutiveWidget(
+  widgetId: string,
+  filters: { port?: string; country?: string },
+): Promise<WidgetPayload> {
+  const scope = await getPortConditions(filters);
+  const ports = scope.ports;
+  const n = ports.length;
+  const passN = ports.filter((p) => p.cls === 'pass').length;
+  const warnN = ports.filter((p) => p.cls === 'warn').length;
+  const failN = ports.filter((p) => p.cls === 'fail').length;
+
+  if (widgetId === 'checks-today') {
+    return { value: n, unit: 'ports checked', provenance: condProv(scope.stale) };
+  }
+  if (widgetId === 'pass-rate' || widgetId === 'warn-rate' || widgetId === 'fail-rate') {
+    const t = await getPortTrend7(filters);
+    const want = widgetId === 'pass-rate' ? 'pass' : widgetId === 'warn-rate' ? 'warn' : 'fail';
+    const head = widgetId === 'pass-rate' ? pct(passN, n) : widgetId === 'warn-rate' ? pct(warnN, n) : pct(failN, n);
+    return {
+      value: head,
+      unit: '%',
+      provenance: condProv(scope.stale),
+      series: t.rows.map((r) => (r.cls === want ? 100 : 0)),
+      labels: t.labels,
+    };
+  }
+  if (widgetId === 'free-tier-budget') {
+    const snap = await quotaSnapshot();
+    const used = snap.reduce((a, x) => a + x.used, 0);
+    const lim = Math.max(1, snap.reduce((a, x) => a + x.limit, 0));
+    return {
+      value: Math.round((used / lim) * 100),
+      unit: '% of free tier',
+      provenance: buildProvenance({ source: 'BoxLens quota manager', class: 'LIVE', ttl: 60 }),
+      rows: snap.map((s) => ({
+        Provider: s.provider,
+        Used: s.used,
+        Limit: s.limit,
+        Window: `${Math.round(s.windowSec / 3600)}h`,
+      })),
+    };
+  }
+  if (widgetId === 'active-ports') {
+    return {
+      value: n,
+      unit: scope.sample ? 'sample ports' : 'ports monitored',
+      provenance: condProv(scope.stale),
+      rows: ports.map((p) => ({
+        Port: `${p.name} (${p.code})`,
+        Country: p.country,
+        Lat: p.lat,
+        Lng: p.lng,
+        Wind: p.windKnots,
+        Wave: p.waveM,
+        Vis: p.visKm,
+        Class: p.cls,
+        Score: p.score,
+      })),
+    };
+  }
+  if (widgetId === 'top-failures') {
+    const top = [...ports].sort((a, b) => b.score - a.score).slice(0, 10);
+    return {
+      value: null,
+      provenance: condProv(scope.stale),
+      rows: top.map((p) => ({
+        Port: `${p.name} (${p.code})`,
+        Country: p.country,
+        Wind: p.windKnots,
+        Wave: p.waveM,
+        Score: p.score,
+      })),
+    };
+  }
+  return unavailable(widgetId, 'executive', `Unknown widget "${widgetId}".`);
+}
+
+async function resolveComplianceWidget(
+  widgetId: string,
+  filters: { port?: string; country?: string },
+): Promise<WidgetPayload> {
+  const scope = await getPortConditions(filters);
+  const ports = scope.ports;
+
+  if (widgetId === 'rule-matrix') {
+    type Field = 'wind' | 'wave' | 'vis' | 'cls';
+    const rules: { Rule: string; field: Field }[] = [
+      { Rule: 'Wind threshold (\u226522 kt)', field: 'wind' },
+      { Rule: 'Wave threshold (\u22651.5 m)', field: 'wave' },
+      { Rule: 'Visibility (\u22644 km)', field: 'vis' },
+      { Rule: 'Overall operational', field: 'cls' },
+    ];
+    const rows = rules.map(({ Rule, field }) => {
+      let p = 0, w = 0, f = 0;
+      for (const port of ports) {
+        if (field === 'wind') {
+          if (port.windKnots >= 34) f++;
+          else if (port.windKnots >= 22) w++;
+          else p++;
+        } else if (field === 'wave') {
+          if (port.waveM >= 3) f++;
+          else if (port.waveM >= 1.5) w++;
+          else p++;
+        } else if (field === 'vis') {
+          if (port.visKm <= 1) f++;
+          else if (port.visKm <= 4) w++;
+          else p++;
+        } else if (port.cls === 'fail') f++;
+        else if (port.cls === 'warn') w++;
+        else p++;
+      }
+      return { Rule, Pass: p, Warn: w, Fail: f };
+    });
+    return { value: null, provenance: condProv(scope.stale), rows };
+  }
+
+  if (widgetId === 'owner-coverage') {
+    // Reframed as country coverage: ports with live data vs the country total.
+    const byCountry = new Map<string, number>();
+    for (const p of ports) {
+      byCountry.set(p.country, (byCountry.get(p.country) ?? 0) + 1);
+    }
+    const cc = filters.country?.toUpperCase();
+    const rows = Array.from(byCountry.entries()).map(([country, withData]) => {
+      const total = cc ? portCount(cc) : portCount(country);
+      return {
+        Country: country,
+        Ports: withData,
+        'With data %': pct(withData, Math.max(withData, total)),
+      };
+    });
+    const withData = ports.length;
+    const total = cc ? portCount(cc) : ports.length;
+    return {
+      value: pct(withData, Math.max(withData, total)),
+      unit: '% ports with live data',
+      provenance: condProv(scope.stale),
+      rows,
+    };
+  }
+
+  if (widgetId === 'iso-violations') {
+    const failing = ports.filter((p) => p.cls === 'fail');
+    const t = await getPortTrend7(filters);
+    return {
+      value: failing.length,
+      unit: 'ports failing thresholds',
+      provenance: condProv(scope.stale),
+      series: t.rows.map((r) => (r.cls === 'fail' ? 1 : 0)),
+      labels: t.labels,
+      rows: failing.map((p) => ({
+        Port: `${p.name} (${p.code})`,
+        Country: p.country,
+        Wind: p.windKnots,
+        Wave: p.waveM,
+        Vis: p.visKm,
+        Issue:
+          p.windKnots >= 34
+            ? 'Wind \u2265 34 kt'
+            : p.waveM >= 3
+              ? 'Wave \u2265 3 m'
+              : p.visKm <= 1
+                ? 'Vis \u2264 1 km'
+                : 'threshold breached',
+      })),
+    };
+  }
+
+  if (widgetId === 'vgm-overweight') {
+    // ESTIMATE proxy: heavy sea (wave \u2265 2 m) elevates weighbridge-motion risk.
+    const atRisk = ports
+      .filter((p) => p.waveM >= 2)
+      .sort((a, b) => b.waveM - a.waveM);
+    return {
+      value: atRisk.length,
+      unit: 'ports at elevated risk (est.)',
+      provenance: condProv(scope.stale, { klass: 'ESTIMATE', method: METHODS.vgm }),
+      rows: atRisk.map((p) => ({
+        Port: `${p.name} (${p.code})`,
+        Country: p.country,
+        'Wave m': p.waveM,
+        Risk: p.waveM >= 3 ? 'High' : 'Moderate',
+      })),
+    };
+  }
+
+  return unavailable(widgetId, 'compliance', `Unknown widget "${widgetId}".`);
 }
 
 // ---- Weather widgets (Open-Meteo Marine + risk score) ----

@@ -357,10 +357,12 @@ function buildFilterBar(): HTMLElement {
       label: 'Port',
       fetchItems: async (q: string): Promise<AutocompleteItem[]> => {
         // Debounced lookup against the full ~17.5k UN/LOCODE sea-port registry
-        // served by /api/v1/ports/search — so any real port is findable, not
-        // just a curated handful.
+        // served by /api/v1/ports/search. When a country is selected, the query
+        // carries it so only ports in that country are returned.
         try {
-          const res = await fetch(`${apiBase()}/ports/search?q=${encodeURIComponent(q)}`, {
+          const country = readFilters().country ?? '';
+          const qs = `q=${encodeURIComponent(q)}` + (country ? `&country=${encodeURIComponent(country)}` : '');
+          const res = await fetch(`${apiBase()}/ports/search?${qs}`, {
             headers: { accept: 'application/json' },
           });
           if (!res.ok) return [];
@@ -381,7 +383,14 @@ function buildFilterBar(): HTMLElement {
       items: COUNTRY_ITEMS,
       value: attr(f.country),
       placeholder: 'Search country…',
-      onChange: (v) => { const cur = readFilters(); cur.country = v || undefined; apply(cur); },
+      onChange: (v) => {
+        const cur = readFilters();
+        cur.country = v || undefined;
+        // Selecting a country narrows the port scope — clear a now-out-of-scope
+        // port so the dashboard reflects the country, not a stale port pick.
+        if (v) cur.port = undefined;
+        apply(cur);
+      },
     }),
   );
   const dates = el('div', { class: 'filter-dates' });

@@ -15,8 +15,8 @@ export interface DashboardMeta {
 
 /** The eight dashboards, in the spec's build order. */
 export const DASHBOARD_CATALOG: ReadonlyArray<DashboardMeta> = Object.freeze([
-  { id: 'executive', title: 'Executive Overview', icon: '📊', dataClass: 'SAMPLE', order: 1 },
-  { id: 'compliance', title: 'Compliance Quality', icon: '✅', dataClass: 'SAMPLE', order: 2 },
+  { id: 'executive', title: 'Executive Overview', icon: '📊', dataClass: 'DAILY', order: 1 },
+  { id: 'compliance', title: 'Compliance Quality', icon: '✅', dataClass: 'DAILY', order: 2 },
   { id: 'weather', title: 'Port Weather & Risk', icon: '🌊', dataClass: 'DAILY', order: 3 },
   { id: 'chokepoints', title: 'Chokepoints & Disruptions', icon: '🗺️', dataClass: 'LIVE', order: 4 },
   { id: 'trade', title: 'Trade & Port Context', icon: '📈', dataClass: 'ANNUAL', order: 5 },
@@ -56,51 +56,55 @@ export function getDashboardMeta(id: DashboardId): DashboardMeta | undefined {
 // Each widget's dataClass/refreshSec/cacheTtlSec matches DATA_SOURCES.md and
 // the server-side resolver in api/_lib/widgets.ts.
 
-// 1. Executive Overview — own-app data (SAMPLE in the demo, LIVE in production).
+// 1. Executive Overview — real operational compliance from Open-Meteo marine
+// conditions per port in the filter scope (DAILY); free-tier budget is LIVE
+// quota. No SAMPLE fixtures.
 registerWidget(
-  { id: 'checks-today', title: 'Checks today', endpoint: '/api/v1/dashboards/executive/checks-today', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'checks-today', title: 'Checks today', endpoint: '/api/v1/dashboards/executive/checks-today', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 registerWidget(
-  { id: 'pass-rate', title: 'Pass rate', endpoint: '/api/v1/dashboards/executive/pass-rate', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'pass-rate', title: 'Pass rate', endpoint: '/api/v1/dashboards/executive/pass-rate', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 registerWidget(
-  { id: 'warn-rate', title: 'Warn rate', endpoint: '/api/v1/dashboards/executive/warn-rate', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'warn-rate', title: 'Warn rate', endpoint: '/api/v1/dashboards/executive/warn-rate', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 registerWidget(
-  { id: 'fail-rate', title: 'Fail rate', endpoint: '/api/v1/dashboards/executive/fail-rate', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'fail-rate', title: 'Fail rate', endpoint: '/api/v1/dashboards/executive/fail-rate', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 registerWidget(
-  { id: 'free-tier-budget', title: 'Free-tier budget used', endpoint: '/api/v1/dashboards/executive/free-tier-budget', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'free-tier-budget', title: 'Free-tier budget used', endpoint: '/api/v1/dashboards/executive/free-tier-budget', refreshSec: 60, dataClass: 'LIVE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 registerWidget(
-  { id: 'active-ports', title: 'Active ports', endpoint: '/api/v1/dashboards/executive/active-ports', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'active-ports', title: 'Active ports', endpoint: '/api/v1/dashboards/executive/active-ports', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 registerWidget(
-  { id: 'top-failures', title: 'Top 10 failing rules', endpoint: '/api/v1/dashboards/executive/top-failures', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'top-failures', title: 'Top 10 operational risks', endpoint: '/api/v1/dashboards/executive/top-failures', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'executive',
 );
 
-// 2. Compliance Quality — own-app data (SAMPLE in the demo).
+// 2. Compliance Quality — real operational compliance from Open-Meteo marine
+// conditions per port (DAILY); vgm-overweight is an ESTIMATE proxy (no free
+// container-weight feed).
 registerWidget(
-  { id: 'rule-matrix', title: 'Per-rule pass/warn/fail', endpoint: '/api/v1/dashboards/compliance/rule-matrix', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'rule-matrix', title: 'Per-rule pass/warn/fail', endpoint: '/api/v1/dashboards/compliance/rule-matrix', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'compliance',
 );
 registerWidget(
-  { id: 'owner-coverage', title: 'Owner code coverage', endpoint: '/api/v1/dashboards/compliance/owner-coverage', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'owner-coverage', title: 'Country coverage', endpoint: '/api/v1/dashboards/compliance/owner-coverage', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'compliance',
 );
 registerWidget(
-  { id: 'iso-violations', title: 'ISO 6346 violations', endpoint: '/api/v1/dashboards/compliance/iso-violations', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'iso-violations', title: 'Operational violations', endpoint: '/api/v1/dashboards/compliance/iso-violations', refreshSec: 1800, dataClass: 'DAILY', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'compliance',
 );
 registerWidget(
-  { id: 'vgm-overweight', title: 'VGM overweight', endpoint: '/api/v1/dashboards/compliance/vgm-overweight', refreshSec: 60, dataClass: 'SAMPLE', cacheTtlSec: 60, fallback: 'unavailable', export: { csv: true } },
+  { id: 'vgm-overweight', title: 'VGM overweight (est.)', endpoint: '/api/v1/dashboards/compliance/vgm-overweight', refreshSec: 1800, dataClass: 'ESTIMATE', cacheTtlSec: 1800, fallback: 'unavailable', export: { csv: true } },
   'compliance',
 );
 

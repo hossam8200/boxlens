@@ -46,37 +46,57 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
       'Filters: ' + (filters.port ?? 'all ports') + ' / ' + (filters.country ?? 'all countries'),
   });
 
-  // View selector row.
+  // View selector — a responsive grid of buttons (one per legacy view), not a
+  // dropdown. auto-fit wraps to one column on narrow screens.
+  let currentView: ViewId = 'compliance';
   const controls = el('div', {
-    class: 'glass',
+    class: 'glass classic-view-grid',
     style:
-      'padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap',
+      'padding:12px 14px;margin-bottom:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px',
   });
-  const sel = el('select', {
-    class: 'classic-view-select',
-    'aria-label': 'Classic dashboard view',
-    style:
-      'padding:6px 10px;border-radius:8px;border:1px solid rgba(15,40,80,0.15);background:var(--dash-glass,#fff);font-size:0.9rem;color:var(--dash-strong,#0f2240)',
-  }) as HTMLSelectElement;
+  const buttons: Record<string, HTMLButtonElement> = {};
   for (const v of VIEW_LABELS) {
-    sel.appendChild(el('option', { value: v.id }, [v.label]));
+    const btn = el(
+      'button',
+      {
+        class: 'classic-view-btn',
+        'data-view': v.id,
+        type: 'button',
+        style:
+          'padding:10px 12px;border-radius:8px;border:1px solid rgba(15,40,80,0.15);background:var(--dash-glass,#fff);color:var(--dash-strong,#0f2240);font-size:0.88rem;cursor:pointer;text-align:left',
+      },
+      [v.label],
+    ) as HTMLButtonElement;
+    buttons[v.id] = btn;
+    btn.addEventListener('click', () => {
+      if (currentView === v.id) return;
+      currentView = v.id;
+      setActiveBtn(v.id);
+      void renderView(body, v.id);
+    });
+    controls.appendChild(btn);
   }
-  controls.appendChild(sel);
-  controls.appendChild(el('span', { style: 'flex:1' }));
-  controls.appendChild(
-    el('span', { class: 'tiny muted', html: SAMPLE_BADGE + ' · Fresh · updated 2m ago' }),
-  );
   root.appendChild(controls);
+  root.appendChild(
+    el('div', { class: 'tiny muted', style: 'margin-bottom:12px', html: SAMPLE_BADGE + ' · Fresh · updated 2m ago' }),
+  );
 
   const body = el('div', { class: 'classic-view-body' });
   root.appendChild(body);
 
-  sel.value = 'compliance';
-  sel.addEventListener('change', () => {
-    void renderView(body, sel.value as ViewId);
-  });
+  function setActiveBtn(id: ViewId): void {
+    for (const [vid, btn] of Object.entries(buttons)) {
+      const active = vid === id;
+      btn.style.fontWeight = active ? '700' : '400';
+      btn.style.borderColor = active ? 'var(--dash-accent,#0f766e)' : 'rgba(15,40,80,0.15)';
+      btn.style.background = active
+        ? 'color-mix(in srgb, var(--dash-accent,#0f766e) 14%, var(--dash-glass,#fff))'
+        : 'var(--dash-glass,#fff)';
+    }
+  }
 
-  await renderView(body, 'compliance');
+  setActiveBtn(currentView);
+  await renderView(body, currentView);
 }
 
 async function renderView(body: HTMLElement, view: ViewId): Promise<void> {

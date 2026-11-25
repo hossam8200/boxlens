@@ -14,8 +14,9 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   pageHeader(root, {
     title: 'Executive Overview',
     blurb:
-      'Top KPIs, 30-day trend, pass/warn/fail mix, top failing rules and active ports. ' +
-      'Own-app data is SAMPLE in the demo (no check-log DB wired); wire BoxLens logs in production.',
+      'Real operational compliance from live Open-Meteo marine conditions across the ' +
+      'ports in scope. Each port is classified pass/warn/fail; KPIs, the trend, the ' +
+      'active-ports map and the drill-down are all real data (free, keyless).',
     note: 'Filters: ' + (filters.port ?? 'all ports') + ' / ' + (filters.country ?? 'all countries'),
   });
 
@@ -41,7 +42,7 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   const failPayload = byId.get('fail-rate');
   const labels = passPayload?.labels ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const trendCard = await chartCell({
-    title: '30-day pass / warn / fail trend',
+    title: '7-day operational trend (representative port)',
     provenance: passPayload?.provenance ?? entries[0]!.payload.provenance,
     rows: labels.map((l, i) => ({
       Day: l,
@@ -93,15 +94,15 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   const topRows = topPayload?.rows ?? [];
   barCell.appendChild(
     await chartCell({
-      title: 'Top 10 failing rules (by hits)',
+      title: 'Top 10 operational risks (by port)',
       provenance: topPayload?.provenance ?? entries[0]!.payload.provenance,
       rows: topRows,
       csvName: 'executive-top-failures.csv',
       render: async (body) => {
         const h = await barChart(
           body,
-          topRows.map((r) => String(r['Rule'] ?? '')),
-          [{ name: 'Hits', data: topRows.map((r) => Number(r['Hits'] ?? 0)), color: '#0891b2' }],
+          topRows.map((r) => String(r['Port'] ?? '')),
+          [{ name: 'Risk score', data: topRows.map((r) => Number(r['Score'] ?? 0)), color: '#dc2626' }],
           { horizontal: true },
         );
         void h;
@@ -111,19 +112,22 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
 
   // Active-ports map
   const mapCard = el('div', { class: 'glass chart-card' });
-  mapCard.appendChild(el('h3', {}, ['Active ports (sample)']));
+  mapCard.appendChild(el('h3', {}, ['Active ports (real conditions)']));
   const mapBody = el('div', { class: 'chart-body', style: 'height:320px' });
   mapCard.appendChild(mapBody);
   mapCell.appendChild(mapCard);
-  const portRows = (byId.get('active-ports')?.rows ?? []) as Array<{ Lat: number; Lng: number; Port: string; 'Pass %': number }>;
+  const portRows = (byId.get('active-ports')?.rows ?? []) as Array<{
+    Lat: number; Lng: number; Port: string; Country: string;
+    Wind: number; Wave: number; Class: string; Score: number;
+  }>;
   try {
     const points = portRows.map((r) => {
-      const pass = Number(r['Pass %'] ?? 0);
-      const color: 'teal' | 'amber' | 'red' = pass >= 95 ? 'teal' : pass >= 90 ? 'amber' : 'red';
+      const color: 'teal' | 'amber' | 'red' =
+        r.Class === 'fail' ? 'red' : r.Class === 'warn' ? 'amber' : 'teal';
       return {
         lat: Number(r.Lat),
         lng: Number(r.Lng),
-        title: `${r.Port} · ${pass}% pass`,
+        title: `${r.Port} · ${r.Wind} kt · ${r.Class}`,
         color,
         radius: 9,
       };
@@ -144,10 +148,11 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
       title: 'Drill-down: per-port results',
       rows: portRows.map((r) => ({
         Port: r.Port,
-        Lat: r.Lat,
-        Lng: r.Lng,
-        Checks: r['Checks' as keyof typeof r] ?? '',
-        'Pass %': r['Pass %'],
+        Country: r.Country,
+        Wind: `${r.Wind} kt`,
+        Wave: `${r.Wave} m`,
+        Class: r.Class,
+        Score: r.Score,
       })),
       csvName: 'executive-ports.csv',
     }),

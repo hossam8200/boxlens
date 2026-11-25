@@ -11,6 +11,26 @@ export function apiBase(): string {
   return `${location.origin}/api/v1`;
 }
 
+/**
+ * Read the active port/country filters from the URL hash
+ * (#/dashboards/executive?port=EGALY&country=EG) and return them as a query
+ * string so per-widget fetches actually carry the filter the user selected.
+ * Without this, selecting a port/country had no effect on the data.
+ */
+function currentFilterQuery(): string {
+  if (typeof location === 'undefined') return '';
+  const hash = location.hash || '';
+  const q = hash.indexOf('?');
+  if (q < 0) return '';
+  const params = new URLSearchParams(hash.slice(q + 1));
+  const parts: string[] = [];
+  const port = params.get('port');
+  const country = params.get('country');
+  if (port) parts.push(`port=${encodeURIComponent(port)}`);
+  if (country) parts.push(`country=${encodeURIComponent(country)}`);
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
 /** Degraded payload returned when a fetch fails or the source is unreachable. */
 function degradedPayload(def: WidgetDef, reason: string): WidgetPayload<null> {
   const klass = def.fallback === 'stale' ? 'LIVE' : 'UNAVAILABLE';
@@ -38,7 +58,7 @@ export async function fetchWidget<T>(
 ): Promise<WidgetPayload<T>> {
   const url = def.endpoint.startsWith('http')
     ? def.endpoint
-    : `${apiBase()}${def.endpoint.replace(/^\/api\/v1/, '')}`;
+    : `${apiBase()}${def.endpoint.replace(/^\/api\/v1/, '')}${currentFilterQuery()}`;
   try {
     const res = await fetch(url, {
       signal,

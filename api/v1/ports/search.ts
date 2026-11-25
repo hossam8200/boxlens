@@ -6,13 +6,15 @@
 // Port autocomplete so users can find any real port, not just the curated 46.
 //
 // Response: { source, total, items: [{ value, label, country }] } with up to 50
-// substring matches (case-insensitive, on name OR UN/LOCODE code). Responses are
-// CDN-cached — the underlying registry is static.
+// substring matches (case-insensitive, on name OR UN/LOCODE code). An optional
+// `country=<ISO2>` narrows matches to that country (used by the dashboards
+// filter bar so selecting a country restricts the Port autocomplete). Responses
+// are CDN-cached — the underlying registry is static.
 import type { VercelRequest, VercelResponse } from '../../_lib/vercel.js';
 import { jsonOk, rfc7807, qp } from '../../_lib/http.js';
 import SEAPORTS from '../../_data/seaports.json' with { type: 'json' };
 
-type PortTuple = [string, string, string]; // [code, name, country]
+type PortTuple = [string, string, string, number | null, number | null]; // [code, name, country, lat, lng]
 
 const MAX = 50;
 
@@ -34,6 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
   const raw = qp(req, 'q') ?? '';
   const q = raw.trim().toLowerCase();
+  const country = (qp(req, 'country') ?? '').trim().toUpperCase();
 
   // CDN-cache the static registry lookups (immutable input → immutable output).
   res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800');
@@ -45,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const items: { value: string; label: string; country: string }[] = [];
   for (const p of INDEX) {
+    if (country && p.country !== country) continue;
     if (p.lc.includes(q)) {
       items.push({ value: p.code, label: `${p.name} (${p.code})`, country: p.country });
       if (items.length >= MAX) break;

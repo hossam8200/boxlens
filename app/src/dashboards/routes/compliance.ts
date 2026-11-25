@@ -4,6 +4,7 @@
 import type { FilterState, WidgetPayload } from '../framework/types';
 import { getDashboardWidgets } from '../framework/registry';
 import { el, unavailableState } from '../framework/components';
+import { dataClassMeta } from '../framework/dataClass';
 import { barChart, lineChart } from '../framework/charts';
 import { pageHeader, fetchAll, kpiRow, chartCell, tableCell } from './_shared';
 
@@ -12,8 +13,9 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   pageHeader(root, {
     title: 'Compliance Quality',
     blurb:
-      'Per-rule pass/warn/fail, ISO 6346 / VGM / BIC owner coverage and overweight declarations. ' +
-      'Own-app data is SAMPLE in the demo; wire the BoxLens rule-engine results in production.',
+      'Real operational compliance from live Open-Meteo marine conditions across the ports in scope: ' +
+      'per-rule pass/warn/fail, country coverage, threshold failures and a VGM-overweight ESTIMATE. ' +
+      'Container-compliance KPIs that need the app\u2019s own check-log DB are not on the free tier.',
     note: 'Filters: ' + (filters.port ?? 'all ports') + ' / ' + (filters.country ?? 'all countries'),
   });
 
@@ -34,9 +36,9 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   kpiGrid.appendChild(kpiCell('Pass rate', `${passRate}%`, byId.get('rule-matrix')!.provenance));
   kpiGrid.appendChild(kpiCell('Fail rate', `${failRate}%`, byId.get('rule-matrix')!.provenance));
   const ownerPayload = byId.get('owner-coverage');
-  kpiGrid.appendChild(kpiCell('Owner coverage', ownerPayload?.value ?? '—', ownerPayload?.provenance));
+  kpiGrid.appendChild(kpiCell('Country coverage', ownerPayload?.value ?? '—', ownerPayload?.provenance));
   const isoPayload = byId.get('iso-violations');
-  kpiGrid.appendChild(kpiCell('ISO 6346 violations', isoPayload?.value ?? '—', isoPayload?.provenance));
+  kpiGrid.appendChild(kpiCell('Operational violations', isoPayload?.value ?? '—', isoPayload?.provenance));
   const vgmPayload = byId.get('vgm-overweight');
   kpiGrid.appendChild(kpiCell('VGM overweight', vgmPayload?.value ?? '—', vgmPayload?.provenance));
   root.appendChild(kpiGrid);
@@ -77,7 +79,7 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
 
   trendCell.appendChild(
     await chartCell({
-      title: 'ISO 6346 check-digit violations (weekly)',
+      title: 'Operational threshold failures (7-day)',
       provenance: isoPayload!.provenance,
       rows: (isoPayload?.labels ?? []).map((l, i) => ({ Week: l, Violations: isoPayload?.series?.[i] ?? 0 })),
       csvName: 'compliance-iso-trend.csv',
@@ -95,7 +97,7 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
 
   vgmCell.appendChild(
     tableCell({
-      title: 'VGM overweight declarations (30d)',
+      title: 'VGM overweight risk (est., by port)',
       rows: vgmPayload?.rows ?? [],
       csvName: 'compliance-vgm-overweight.csv',
     }),
@@ -108,7 +110,7 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
   root.appendChild(grid3);
   ownerCell.appendChild(
     tableCell({
-      title: 'Owner-code (BIC) coverage',
+      title: 'Country coverage (ports with live data)',
       rows: ownerPayload?.rows ?? [],
       csvName: 'compliance-owner-coverage.csv',
     }),
@@ -119,10 +121,13 @@ export async function render(root: HTMLElement, filters: FilterState): Promise<v
 
 function kpiCell(label: string, value: unknown, prov: WidgetPayload['provenance'] | undefined): HTMLElement {
   const card = el('div', { class: 'glass kpi-card col-2' });
+  const badge = prov ? dataClassMeta(prov.class) : null;
   card.innerHTML =
     `<div class="kpi-label">${escape(String(label))}</div>` +
     `<div><span class="kpi-value">${escape(String(value))}</span></div>` +
-    (prov ? `<div class="prov-meta"><span class="dc-badge dc-sample"><span class="dot"></span>${prov.class}</span> · <span class="src">${escape(prov.source)}</span></div>` : '');
+    (prov && badge
+      ? `<div class="prov-meta"><span class="dc-badge ${badge.cls}" title="${escape(badge.hint)}"><span class="dot"></span>${prov.class}</span> · <span class="src">${escape(prov.source)}</span></div>`
+      : '');
   return card;
 }
 

@@ -14,7 +14,7 @@ describe('tileData', () => {
     expect(exec).toBeDefined();
     expect(exec!.icon).toBe('📊');
     expect(exec!.title).toBe('Executive Overview');
-    expect(exec!.dataClass).toBe('SAMPLE');
+    expect(exec!.dataClass).toBe('DAILY');
   });
 
   it('maps each data-class to a badge CSS class', () => {
