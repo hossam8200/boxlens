@@ -29,7 +29,7 @@ export interface MapHandle {
 export async function dashMap(
   target: HTMLElement,
   points: MapPoint[],
-  opts: { center?: [number, number]; zoom?: number } = {},
+  opts: { center?: [number, number]; zoom?: number; path?: { coords: [number, number][]; color?: MapPoint['color'] } } = {},
 ): Promise<MapHandle> {
   const L = (await import('leaflet')).default;
   // Leaflet's CSS is imported once for the whole app from styles.css via CDN
@@ -70,6 +70,18 @@ export async function dashMap(
         .bindTooltip(p.title, { direction: 'top' });
     }
     validPoints.push([p.lat, p.lng]);
+  }
+
+  // Optional routed path (dashed polyline) — used by the VGM Route tab.
+  if (opts.path && opts.path.coords.length > 1) {
+    const pcolor = COLOR_HEX[opts.path.color ?? 'teal'];
+    L.polyline(opts.path.coords, {
+      color: pcolor,
+      weight: 2,
+      opacity: 0.85,
+      dashArray: '6 8',
+    }).addTo(map);
+    for (const c of opts.path.coords) validPoints.push(c);
   }
 
   if (validPoints.length > 1) {
