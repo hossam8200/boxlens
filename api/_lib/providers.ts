@@ -328,6 +328,7 @@ export async function fetchOverpassNearby(
   const INSTANCES = [
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass-api.de/api/interpreter',
+    'https://overpass.openstreetmap.fr/api/interpreter',
   ];
   const body = `data=${encodeURIComponent(q)}`;
   const cacheKey = `overpass:${lat.toFixed(2)},${lng.toFixed(2)},${radiusM}`;
@@ -337,8 +338,9 @@ export async function fetchOverpassNearby(
     const quota = await checkAndIncrement('overpass');
     if (!quota.allowed) throw new Error('overpass quota exhausted');
     // Overpass public instances require a descriptive User-Agent (a missing/
-    // generic UA gets HTTP 406) and prefer POST for queries. Try the primary
-    // instance, then the kumi mirror as a fallback before failing the call.
+    // generic UA gets HTTP 406) and prefer POST for queries. The public
+    // instances are flaky from a far region (alternating 406 / timeout), so try
+    // three mirrors (kumi, de, fr) before failing the call.
     let lastErr: unknown;
     for (const base of INSTANCES) {
       try {
@@ -346,6 +348,7 @@ export async function fetchOverpassNearby(
           fetch(base, {
             method: 'POST',
             headers: {
+              accept: 'application/json',
               'content-type': 'application/x-www-form-urlencoded',
               'user-agent': 'BoxLens/2.7 (port-intelligence; https://boxlens.vercel.app)',
             },
