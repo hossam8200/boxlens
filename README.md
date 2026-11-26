@@ -69,7 +69,9 @@ The platform's **landing page is the visual tour** — [`boxlens-features.html`]
 an enterprise scroll-snap slide deck (glassmorphism, real container-terminal imagery)
 showcasing every capability below. On Vercel it is served at the root
 (`https://boxlens.vercel.app/` → `boxlens-features.html` via `vercel.json`); the last
-slide's **Open BoxLens** button enters the application at `/app`.
+slide's **Open BoxLens** button enters the application at `/dashboards` (the path
+`/app` is avoided because Vercel's filesystem routing would serve the Vite source
+`app/index.html` for it instead of the built `app/dist/index.html`).
 
 | Pillar | What it does | Data source | Class |
 | --- | --- | --- | --- |
