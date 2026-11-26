@@ -65,10 +65,11 @@ source. See [`CHANGELOG.md`](CHANGELOG.md) for version history.
 
 ## Features & Capabilities
 
-A visual tour of the platform lives at [`boxlens-features.html`](./boxlens-features.html) —
-an enterprise slide deck (CSS scroll-snapping, glassmorphism, real container-terminal
-imagery) showcasing every capability below. Open it directly or at
-`https://boxlens.vercel.app/boxlens-features.html`.
+The platform's **landing page is the visual tour** — [`boxlens-features.html`](./boxlens-features.html),
+an enterprise scroll-snap slide deck (glassmorphism, real container-terminal imagery)
+showcasing every capability below. On Vercel it is served at the root
+(`https://boxlens.vercel.app/` → `boxlens-features.html` via `vercel.json`); the last
+slide's **Open BoxLens** button enters the application at `/app`.
 
 | Pillar | What it does | Data source | Class |
 | --- | --- | --- | --- |

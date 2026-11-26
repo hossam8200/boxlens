@@ -18,7 +18,8 @@
     }
   ],
   "rewrites": [
-    { "source": "/", "destination": "/app/dist/index.html" },
+    { "source": "/", "destination": "/boxlens-features.html" },
+    { "source": "/app", "destination": "/app/dist/index.html" },
     { "source": "/assets/:path*", "destination": "/app/dist/assets/:path*" }
   ]
 }
